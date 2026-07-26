@@ -3750,6 +3750,20 @@ static int ath11k_dp_rx_reap_mon_status_ring(struct ath11k_base *ab, int mac_id,
 
 	srng = &ab->hal.srng_list[rx_ring->refill_buf_ring.ring_id];
 
+	/*
+	 * During firmware recovery the extended interrupt groups are
+	 * re-enabled before the monitor status ring is set up again;
+	 * servicing it in that window dereferences an uninitialized srng
+	 * and panics in interrupt context. This is a source ring, so
+	 * ath11k_hal_srng_access_begin() reads u.src_ring.tp_addr - test
+	 * that pointer rather than ->initialized, because
+	 * ath11k_hal_srng_setup() sets ->initialized before ->tp_addr
+	 * without a barrier, leaving an ->initialized check racing the
+	 * ring rebuild it is meant to exclude.
+	 */
+	if (!srng->u.src_ring.tp_addr)
+		return 0;
+
 	spin_lock_bh(&srng->lock);
 
 	ath11k_hal_srng_access_begin(ab, srng);
