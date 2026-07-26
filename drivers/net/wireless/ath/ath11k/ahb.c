@@ -483,6 +483,10 @@ static void ath11k_ahb_free_irq(struct ath11k_base *ab)
 static void ath11k_ahb_ce_tasklet(struct tasklet_struct *t)
 {
 	struct ath11k_ce_pipe *ce_pipe = from_tasklet(ce_pipe, t, intr_tq);
+	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
+
+	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
+		return;
 
 	ath11k_ce_per_engine_service(ce_pipe->ab, ce_pipe->pipe_num);
 
@@ -492,6 +496,16 @@ static void ath11k_ahb_ce_tasklet(struct tasklet_struct *t)
 static irqreturn_t ath11k_ahb_ce_interrupt_handler(int irq, void *arg)
 {
 	struct ath11k_ce_pipe *ce_pipe = arg;
+	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
+
+	/*
+	 * While the Q6 is stopped or booting, the WLAN CE register space
+	 * is not accessible; a read raises a synchronous external abort.
+	 * The remoteproc core marks the state before it starts the
+	 * TrustZone teardown, so skip the (edge triggered) interrupt.
+	 */
+	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
+		return IRQ_HANDLED;
 
 	/* last interrupt received for this CE */
 	ce_pipe->timestamp = jiffies;
