@@ -2623,6 +2623,60 @@ static bool ieee80211_frame_allowed(struct ieee80211_rx_data *rx, __le16 fc)
 	return true;
 }
 
+#ifdef CPTCFG_MAC80211_NSS_SUPPORT
+#define case_rtn_string(val) case val: return #val
+
+static const char *nss_tx_status_str(nss_tx_status_t status)
+{
+	switch (status) {
+		case_rtn_string(NSS_TX_SUCCESS);
+		case_rtn_string(NSS_TX_FAILURE);
+		case_rtn_string(NSS_TX_FAILURE_QUEUE);
+		case_rtn_string(NSS_TX_FAILURE_NOT_READY);
+		case_rtn_string(NSS_TX_FAILURE_TOO_LARGE);
+		case_rtn_string(NSS_TX_FAILURE_TOO_SHORT);
+		case_rtn_string(NSS_TX_FAILURE_NOT_SUPPORTED);
+		case_rtn_string(NSS_TX_FAILURE_BAD_PARAM);
+		case_rtn_string(NSS_TX_FAILURE_NOT_ENABLED);
+		case_rtn_string(NSS_TX_FAILURE_SYNC_BAD_PARAM);
+		case_rtn_string(NSS_TX_FAILURE_SYNC_TIMEOUT);
+		case_rtn_string(NSS_TX_FAILURE_SYNC_FW_ERR);
+	default:
+		return "Unknown NSS TX status";
+	}
+}
+
+static void netif_rx_nss(struct ieee80211_rx_data *rx,
+			 struct sk_buff *skb)
+{
+	struct ieee80211_sub_if_data *sdata = rx->sdata;
+	int ret;
+
+	if (!sdata->nssctx)
+		goto out;
+
+	/* NSS expects ethernet header in skb data so resetting here */
+	skb_push(skb, ETH_HLEN);
+	ret = nss_virt_if_tx_buf(sdata->nssctx, skb);
+	if (ret) {
+		if (net_ratelimit()) {
+			if (NSS_TX_FAILURE_NOT_ENABLED == ret)
+			  goto out;
+			sdata_err(sdata, "NSS TX failed with error: %s\n",
+				  nss_tx_status_str(ret));
+		}
+		goto out;
+	}
+
+	return;
+out:
+	if (rx->napi)
+		napi_gro_receive(rx->napi, skb);
+	else
+		netif_receive_skb(skb);
+}
+#endif
+
 static void ieee80211_deliver_skb_to_local_stack(struct sk_buff *skb,
 						 struct ieee80211_rx_data *rx)
 {
@@ -2662,11 +2716,15 @@ static void ieee80211_deliver_skb_to_local_stack(struct sk_buff *skb,
 			     !ether_addr_equal(ehdr->h_dest, sdata->vif.addr)))
 			ether_addr_copy(ehdr->h_dest, sdata->vif.addr);
 
+#ifdef CPTCFG_MAC80211_NSS_SUPPORT
+		netif_rx_nss(rx, skb);
+#else
 		/* deliver to local stack */
 		if (rx->list)
 			list_add_tail(&skb->list, rx->list);
 		else
 			netif_receive_skb(skb);
+#endif
 	}
 }
 
