@@ -1741,7 +1741,7 @@ struct htt_ppdu_stats_info *ath11k_dp_htt_get_ppdu_desc(struct ath11k *ar,
 	return ppdu_info;
 }
 
-void ath11k_copy_to_delay_stats(struct ath11k_peer *peer,
+static void ath11k_copy_to_delay_stats(struct ath11k_peer *peer,
 				  struct htt_ppdu_user_stats* usr_stats)
 {
 	peer->ppdu_stats_delayba.reserved0 = usr_stats->rate.reserved0;
@@ -1756,7 +1756,7 @@ void ath11k_copy_to_delay_stats(struct ath11k_peer *peer,
 	peer->delayba_flag = true;
 }
 
-void ath11k_copy_to_bar(struct ath11k_peer *peer,
+static void ath11k_copy_to_bar(struct ath11k_peer *peer,
 			struct htt_ppdu_user_stats* usr_stats)
 {
 	usr_stats->rate.reserved0 = peer->ppdu_stats_delayba.reserved0;
