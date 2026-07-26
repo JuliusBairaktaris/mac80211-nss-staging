@@ -2621,7 +2621,7 @@ static void mpath_set_pinfo(struct mesh_path *mpath, u8 *next_hop,
 	if (mpath->flags & MESH_PATH_RESOLVED)
 		pinfo->flags |= NL80211_MPATH_FLAG_RESOLVED;
 	pinfo->hop_count = mpath->hop_count;
-	pinfo->path_change_count = mpath->path_change_count;
+	pinfo->path_change_count = atomic_read(&mpath->path_change_count);
 }
 
 static int ieee80211_get_mpath(struct wiphy *wiphy, struct net_device *dev,
