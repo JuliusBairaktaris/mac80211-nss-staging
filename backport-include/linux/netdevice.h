@@ -4,6 +4,8 @@
 #include <linux/version.h>
 #include <backport/magic.h>
 
+#define netdev_tstats(dev)  dev->tstats
+
 #if LINUX_VERSION_IS_LESS(4,15,0)
 static inline int _bp_netdev_upper_dev_link(struct net_device *dev,
 					    struct net_device *upper_dev)

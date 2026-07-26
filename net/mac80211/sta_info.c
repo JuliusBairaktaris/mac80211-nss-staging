@@ -2505,6 +2505,9 @@ sta_get_last_rx_stats(struct sta_info *sta, int link_id)
 
 	stats = &link_sta_info->rx_stats;
 
+	if (ieee80211_hw_check(&sta->local->hw, SUPPORTS_NSS_OFFLOAD))
+		return stats;
+
 	if (!link_sta_info->pcpu_rx_stats)
 		return stats;
 

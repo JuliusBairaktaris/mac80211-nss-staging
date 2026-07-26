@@ -406,6 +406,20 @@ enum ieee80211_bss_change {
 	/* when adding here, make sure to change ieee80211_reconfig */
 };
 
+/**
+ * enum ieee80211_nss_bss_change - NSS BSS change notification flags
+ *
+ * These flags are used with the nss_bss_info_changed() callback
+ * to indicate which NSS BSS parameter changed.
+ *
+ * @BSS_CHANGED_NSS_AP_ISOLATE: AP Isolate feature in NSS mode
+ *
+ */
+
+enum ieee80211_nss_bss_change {
+	BSS_CHANGED_NSS_AP_ISOLATE  = BIT(0),
+};
+
 /*
  * The maximum number of IPv4 addresses listed for ARP filtering. If the number
  * of addresses for an interface increase beyond this value, hardware ARP
@@ -760,6 +774,7 @@ struct ieee80211_parsed_tpe {
  *	(as opposed to hearing its value from another link's beacon).
  * @s1g_long_beacon_period: number of beacon intervals between each long
  *	beacon transmission.
+ * @nss_ap_isolate: Used for notifying the NSS host about AP isolate feature
  */
 struct ieee80211_bss_conf {
 	struct ieee80211_vif *vif;
@@ -861,6 +876,7 @@ struct ieee80211_bss_conf {
 	u8 bss_param_ch_cnt_link_id;
 
 	u8 s1g_long_beacon_period;
+	bool nss_ap_isolate;
 };
 
 /**
@@ -2180,6 +2196,16 @@ static inline bool lockdep_vif_wiphy_mutex_held(struct ieee80211_vif *vif)
 			      lockdep_vif_wiphy_mutex_held(vif))
 
 /**
+ * ieee80211_vif_to_wdev_relaxed - return a wdev struct from a vif
+ * @vif: the vif to get the wdev for
+ *
+ * This function is similar to ieee80211_vif_to_wdev, but the wdev
+ * is returned even if sdata is not running.
+ *
+ */
+struct wireless_dev *ieee80211_vif_to_wdev_relaxed(struct ieee80211_vif *vif);
+
+/**
  * enum ieee80211_key_flags - key flags
  *
  * These flags are used for communication about keys between the driver
@@ -2892,6 +2918,8 @@ struct ieee80211_txq {
  *	HW flag so drivers can opt in according to their own control, e.g. in
  *	testing.
  *
+ * @IEEE80211_HW_SUPPORTS_NSS_OFFLOAD: Hardware/driver supports NSS offload
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2952,6 +2980,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_DISALLOW_PUNCTURING,
 	IEEE80211_HW_HANDLES_QUIET_CSA,
 	IEEE80211_HW_STRICT,
+	IEEE80211_HW_SUPPORTS_NSS_OFFLOAD,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
@@ -3984,6 +4013,10 @@ struct ieee80211_prep_tx_info {
  *	non-MLO connections.
  *	The callback can sleep.
  *
+ * @nss_bss_info_changed: Handler for configuration requests related to NSS BSS
+ * parameters that may vary during BSS's lifespan, and may affect low level
+ * driver.
+ *
  * @prepare_multicast: Prepare for multicast filter configuration.
  *	This callback is optional, and its return value is passed
  *	to configure_filter(). This callback must be atomic.
@@ -4571,6 +4604,9 @@ struct ieee80211_ops {
 				  struct ieee80211_bss_conf *info,
 				  u64 changed);
 
+	void (*nss_bss_info_changed)(struct ieee80211_hw *hw,
+				     struct ieee80211_vif *vif,
+				     u64 changed);
 	int (*start_ap)(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			struct ieee80211_bss_conf *link_conf);
 	void (*stop_ap)(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
