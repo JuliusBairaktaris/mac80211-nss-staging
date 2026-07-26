@@ -33,6 +33,7 @@
 #include "dbring.h"
 #include "spectral.h"
 #include "wow.h"
+#include "rx_desc.h"
 #include "fw.h"
 #include "coredump.h"
 
@@ -526,6 +527,8 @@ struct ath11k_htt_data_stats {
 	u64 bw[ATH11K_COUNTER_TYPE_MAX][ATH11K_BW_NUM];
 	u64 nss[ATH11K_COUNTER_TYPE_MAX][ATH11K_NSS_NUM];
 	u64 gi[ATH11K_COUNTER_TYPE_MAX][ATH11K_GI_NUM];
+	u64 transmit_type[ATH11K_COUNTER_TYPE_MAX][HAL_RX_RECEPTION_TYPE_MAX];
+	u64 ru_loc[ATH11K_COUNTER_TYPE_MAX][HAL_RX_RU_ALLOC_TYPE_MAX];
 };
 
 struct ath11k_htt_tx_stats {
@@ -533,6 +536,9 @@ struct ath11k_htt_tx_stats {
 	u64 tx_duration;
 	u64 ba_fails;
 	u64 ack_fails;
+	u16 ru_start;
+	u16 ru_tones;
+	u32 mu_group[MAX_MU_GROUP_ID];
 };
 
 struct ath11k_per_ppdu_tx_stats {
@@ -651,11 +657,16 @@ struct ath11k_per_peer_tx_stats {
 	u32 succ_bytes;
 	u32 retry_bytes;
 	u32 failed_bytes;
+	u32 duration;
 	u16 succ_pkts;
 	u16 retry_pkts;
 	u16 failed_pkts;
-	u32 duration;
+	u16 ru_start;
+	u16 ru_tones;
 	u8 ba_fails;
+	u8 ppdu_type;
+	u32 mu_grpid;
+	u32 mu_pos;
 	bool is_ampdu;
 };
 
