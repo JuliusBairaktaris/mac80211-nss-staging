@@ -478,7 +478,9 @@ static inline int drv_sta_add(struct ieee80211_local *local,
 	might_sleep();
 	lockdep_assert_wiphy(local->hw.wiphy);
 
-	sdata = get_bss_sdata(sdata);
+	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD))
+		sdata = get_bss_sdata(sdata);
+
 	if (!check_sdata_in_driver(sdata))
 		return -EIO;
 
@@ -519,7 +521,10 @@ static inline void drv_vif_add_debugfs(struct ieee80211_local *local,
 	    WARN_ON(!sdata->vif.debugfs_dir))
 		return;
 
-	sdata = get_bss_sdata(sdata);
+	if (!(sdata->vif.type == NL80211_IFTYPE_AP_VLAN &&
+	      ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)))
+		sdata = get_bss_sdata(sdata);
+
 	if (!check_sdata_in_driver(sdata))
 		return;
 
