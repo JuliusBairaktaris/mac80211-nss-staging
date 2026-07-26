@@ -491,7 +491,7 @@ ath11k_dp_tx_htt_tx_complete_buf(struct ath11k_base *ab,
 	}
 
 	spin_lock_bh(&ab->base_lock);
-	peer = ath11k_peer_find_by_id(ab, ts->peer_id);
+	peer = ath11k_peer_find_by_id(ar, ts->peer_id);
 	if (!peer || !peer->sta) {
 		ath11k_dbg(ab, ATH11K_DBG_DATA,
 			   "dp_tx: failed to find the peer with peer_id %d\n",
@@ -587,7 +587,7 @@ void ath11k_dp_tx_update_txcompl(struct ath11k *ar, struct hal_tx_status *ts)
 	int ret;
 
 	spin_lock_bh(&ab->base_lock);
-	peer = ath11k_peer_find_by_id(ab, ts->peer_id);
+	peer = ath11k_peer_find_by_id(ar, ts->peer_id);
 	if (!peer || !peer->sta) {
 		ath11k_dbg(ab, ATH11K_DBG_DP_TX,
 			   "failed to find the peer by id %u\n", ts->peer_id);
@@ -805,7 +805,7 @@ static void ath11k_dp_tx_complete_msdu(struct ath11k *ar,
 	}
 
 	spin_lock_bh(&ab->base_lock);
-	peer = ath11k_peer_find_by_id(ab, ts.peer_id);
+	peer = ath11k_peer_find_by_id(ar, ts.peer_id);
 	if (unlikely(!peer || !peer->sta)) {
 		ath11k_dbg(ab, ATH11K_DBG_DATA,
 			   "dp_tx: failed to find the peer with peer_id %d\n",

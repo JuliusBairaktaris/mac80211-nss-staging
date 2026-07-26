@@ -98,33 +98,31 @@ struct ath11k_peer {
 	bool delete_in_progress;
 };
 
-void ath11k_peer_unmap_event(struct ath11k_base *ab, u16 peer_id);
-void ath11k_peer_unmap_v2_event(struct ath11k_base *ab, u16 peer_id, u8 *mac_addr,
+
+void ath11k_peer_unmap_event(struct ath11k *ar, u16 peer_id);
+void ath11k_peer_unmap_v2_event(struct ath11k *ar, u16 peer_id, u8 *mac_addr,
 			        bool is_wds, u32 free_wds_count);
-void ath11k_peer_map_event(struct ath11k_base *ab, u8 vdev_id, u16 peer_id,
+void ath11k_peer_map_event(struct ath11k *ar, u8 vdev_id, u16 peer_id,
 			   u8 *mac_addr, u16 ast_hash, u16 hw_peer_id);
-void ath11k_peer_map_v2_event(struct ath11k_base *ab, u8 vdev_id, u16 peer_id,
+void ath11k_peer_map_v2_event(struct ath11k *ar, u8 vdev_id, u16 peer_id,
 			      u8 *mac_addr, u16 ast_hash, u16 hw_peer_id,
 			      bool is_wds);
-struct ath11k_peer *ath11k_peer_find(struct ath11k_base *ab, int vdev_id,
+struct ath11k_peer *ath11k_peer_find(struct ath11k *at, int vdev_id,
 				     const u8 *addr);
-struct ath11k_peer *ath11k_peer_find_by_addr(struct ath11k_base *ab,
-					     const u8 *addr);
-struct ath11k_peer *ath11k_peer_find_by_id(struct ath11k_base *ab, int peer_id);
 void ath11k_peer_cleanup(struct ath11k *ar, u32 vdev_id);
 int ath11k_peer_delete(struct ath11k *ar, u32 vdev_id, u8 *addr);
 int ath11k_peer_create(struct ath11k *ar, struct ath11k_vif *arvif,
 		       struct ieee80211_sta *sta, struct peer_create_params *param);
 int ath11k_wait_for_peer_delete_done(struct ath11k *ar, u32 vdev_id,
 				     const u8 *addr);
-struct ath11k_peer *ath11k_peer_find_by_vdev_id(struct ath11k_base *ab,
+struct ath11k_peer *ath11k_peer_find_by_vdev_id(struct ath11k *ar,
 						int vdev_id);
-int ath11k_peer_rhash_tbl_init(struct ath11k_base *ab);
-void ath11k_peer_rhash_tbl_destroy(struct ath11k_base *ab);
-int ath11k_peer_rhash_delete(struct ath11k_base *ab, struct ath11k_peer *peer);
+int ath11k_peer_rhash_tbl_init(struct ath11k *ar);
+void ath11k_peer_rhash_tbl_destroy(struct ath11k *ar);
+int ath11k_peer_rhash_delete(struct ath11k *ar, struct ath11k_peer *peer);
 
 #ifdef CPTCFG_ATH11K_NSS_SUPPORT
-struct ath11k_ast_entry *ath11k_peer_ast_find_by_addr(struct ath11k_base *ab,
+struct ath11k_ast_entry *ath11k_peer_ast_find_by_addr(struct ath11k *ar,
 						      u8* addr);
 struct ath11k_ast_entry *ath11k_peer_ast_find_by_pdev_idx(struct ath11k *ar,
 							  u8* addr);
@@ -138,11 +136,11 @@ void ath11k_peer_del_ast(struct ath11k *ar, struct ath11k_ast_entry *ast_entry);
 void ath11k_peer_ast_cleanup(struct ath11k *ar, struct ath11k_peer *peer,
 			     bool is_wds, u32 free_wds_count);
 void ath11k_peer_ast_wds_wmi_wk(struct work_struct *wk);
-struct ath11k_ast_entry *ath11k_peer_ast_find_by_peer(struct ath11k_base *ab,
+struct ath11k_ast_entry *ath11k_peer_ast_find_by_peer(struct ath11k *ar,
 						      struct ath11k_peer *peer,
 						      u8* addr);
 #else
-static inline struct ath11k_ast_entry *ath11k_peer_ast_find_by_addr(struct ath11k_base *ab,
+static inline struct ath11k_ast_entry *ath11k_peer_ast_find_by_addr(struct ath11k *ar,
 								    u8* addr)
 {
 	return NULL;
@@ -190,7 +188,7 @@ static inline void ath11k_peer_ast_wds_wmi_wk(struct work_struct *wk)
 	return;
 }
 
-static inline struct ath11k_ast_entry *ath11k_peer_ast_find_by_peer(struct ath11k_base *ab,
+static inline struct ath11k_ast_entry *ath11k_peer_ast_find_by_peer(struct ath11k *ar,
 								    struct ath11k_peer *peer,
 								    u8* addr)
 {

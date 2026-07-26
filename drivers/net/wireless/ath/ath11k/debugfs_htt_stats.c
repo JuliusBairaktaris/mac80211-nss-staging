@@ -4162,7 +4162,7 @@ void htt_print_peer_ctrl_path_txrx_stats_tlv(const void *tag_buf,
 	stats_req->buf_len = len;
 }
 
-static int ath11k_dbg_htt_ext_stats_parse(struct ath11k_base *ab,
+static int ath11k_dbg_htt_ext_stats_parse(struct ath11k_base *ab, struct ath11k *ar,
 					  u16 tag, u16 len, const void *tag_buf,
 					  void *user_data)
 {
@@ -4592,7 +4592,7 @@ void ath11k_debugfs_htt_ext_stats_handler(struct ath11k_base *ab,
 	spin_unlock_bh(&ar->debug.htt_stats.lock);
 
 	len = FIELD_GET(HTT_T2H_EXT_STATS_INFO1_LENGTH, msg->info1);
-	ret = ath11k_dp_htt_tlv_iter(ab, msg->data, len,
+	ret = ath11k_dp_htt_tlv_iter(ab, ar, msg->data, len,
 				     ath11k_dbg_htt_ext_stats_parse,
 				     stats_req);
 	if (ret)
