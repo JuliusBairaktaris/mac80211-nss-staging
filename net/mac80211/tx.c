@@ -1028,11 +1028,23 @@ ieee80211_tx_h_stats(struct ieee80211_tx_data *tx)
 {
 	struct sk_buff *skb;
 	int ac = -1;
+	struct ieee80211_hdr *hdr;
+	bool nss_offload;
 
 	if (!tx->sta)
 		return TX_CONTINUE;
 
+	nss_offload = ieee80211_hw_check(&tx->local->hw, SUPPORTS_NSS_OFFLOAD);
+
 	skb_queue_walk(&tx->skbs, skb) {
+		/* Do not increment stats for data packets if NSS offload is enabled.
+		 * As we use the stats from NSS, this will be a duplication
+		 */
+		if (nss_offload) {
+			hdr = (void *) skb->data;
+			if (ieee80211_is_data(hdr->frame_control))
+				continue;
+		}
 		ac = skb_get_queue_mapping(skb);
 		tx->sta->deflink.tx_stats.bytes[ac] += skb->len;
 	}
@@ -2942,7 +2954,9 @@ static struct sk_buff *ieee80211_build_hdr(struct ieee80211_sub_if_data *sdata,
 
 	if (unlikely(!multicast &&
 		     (sk_requests_wifi_status(skb->sk) ||
-		      ctrl_flags & IEEE80211_TX_CTL_REQ_TX_STATUS)))
+		     ctrl_flags & IEEE80211_TX_CTL_REQ_TX_STATUS) &&
+		     !(ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD) &&
+		       ieee80211_is_data(fc) && !ieee80211_is_qos_nullfunc(fc))))
 		info_id = ieee80211_store_ack_skb(local, skb, &info_flags,
 						  cookie);
 
@@ -4761,7 +4775,8 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
 			memcpy(IEEE80211_SKB_CB(seg), info, sizeof(*info));
 	}
 
-	if (unlikely(sk_requests_wifi_status(skb->sk))) {
+	if (unlikely(sk_requests_wifi_status(skb->sk) &&
+		     !ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD))) {
 		info->status_data = ieee80211_store_ack_skb(local, skb,
 							    &info->flags, NULL);
 		if (info->status_data)
@@ -4770,7 +4785,7 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
 
 	dev_sw_netstats_tx_add(dev, skbs, len);
 
-	if (sta) {
+	if (sta && !ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) {
 		sta->deflink.tx_stats.packets[queue] += skbs;
 		sta->deflink.tx_stats.bytes[queue] += len;
 	}

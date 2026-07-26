@@ -2764,6 +2764,9 @@ EXPORT_SYMBOL(cfg80211_link_sinfo_alloc_tid_stats);
 
 int cfg80211_sinfo_alloc_tid_stats(struct station_info *sinfo, gfp_t gfp)
 {
+	if (sinfo->pertid)
+		return 0;
+
 	sinfo->pertid = kzalloc_objs(*(sinfo->pertid), IEEE80211_NUM_TIDS + 1,
 				     gfp);
 	if (!sinfo->pertid)
