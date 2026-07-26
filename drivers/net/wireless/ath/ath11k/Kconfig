@@ -23,6 +23,20 @@ config ATH11K_NSS_SUPPORT
 
 	  If unsure, say Y to enable NSS offload support.
 
+config ATH11K_MEM_PROFILE_512M
+	bool "ath11k enable 512MB memory profile"
+	depends on ATH11K
+	default n
+	---help---
+	Enables 512MB memory profile for ath11k
+
+config ATH11K_MEM_PROFILE_256M
+	bool "ath11k enable 256MB memory profile"
+	depends on ATH11K
+	default n
+	---help---
+	Enables 256MB memory profile for ath11k
+
 config ATH11K_AHB
 	tristate "Atheros ath11k AHB support"
 	depends on m
