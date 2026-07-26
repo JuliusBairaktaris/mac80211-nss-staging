@@ -7830,15 +7830,17 @@ err:
 	return ret;
 }
 
-static int ath11k_mac_vif_unref(int buf_id, void *skb, void *ctx)
+static void ath11k_mac_vif_unref(struct dp_tx_ring *tx_ring,
+				 struct ieee80211_vif *vif)
 {
-	struct ieee80211_vif *vif = ctx;
-	struct ath11k_skb_cb *skb_cb = ATH11K_SKB_CB(skb);
+	struct ath11k_skb_cb *skb_cb;
+	int i;
 
-	if (skb_cb->vif == vif)
-		skb_cb->vif = NULL;
-
-	return 0;
+	for_each_set_bit(i, tx_ring->idrs, DP_TX_IDR_SIZE) {
+		skb_cb = ATH11K_SKB_CB(tx_ring->idr_pool[i].buf);
+		if (skb_cb->vif == vif)
+			skb_cb->vif = NULL;
+	}
 }
 
 static void ath11k_mac_op_remove_interface(struct ieee80211_hw *hw,
@@ -7932,8 +7934,7 @@ err_vdev_del:
 
 	for (i = 0; i < ab->hw_params.hal_params->num_tx_rings; i++) {
 		spin_lock_bh(&ab->dp.tx_ring[i].tx_idr_lock);
-		idr_for_each(&ab->dp.tx_ring[i].txbuf_idr,
-			     ath11k_mac_vif_unref, vif);
+		ath11k_mac_vif_unref(&ab->dp.tx_ring[i], vif);
 		spin_unlock_bh(&ab->dp.tx_ring[i].tx_idr_lock);
 	}
 
