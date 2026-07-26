@@ -542,7 +542,7 @@ void
 ath11k_hal_rx_sw_mon_ring_buf_paddr_get(void *rx_desc,
 					struct hal_sw_mon_ring_entries *sw_mon_ent);
 enum hal_rx_mon_status
-ath11k_hal_rx_parse_mon_status(struct ath11k_base *ab,
+ath11k_hal_rx_parse_mon_status(struct ath11k *ar,
 			       struct hal_rx_mon_ppdu_info *ppdu_info,
 			       struct sk_buff *skb);
 
