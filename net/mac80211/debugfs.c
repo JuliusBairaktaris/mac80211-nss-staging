@@ -504,6 +504,7 @@ static const char *hw_flag_names[] = {
 	FLAG(HANDLES_QUIET_CSA),
 	FLAG(STRICT),
 	FLAG(SUPPORTS_NSS_OFFLOAD),
+	FLAG(HAS_TX_QUEUE),
 #undef FLAG
 };
 
