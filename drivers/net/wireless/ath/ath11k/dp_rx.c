@@ -1529,6 +1529,81 @@ static int ath11k_htt_tlv_ppdu_stats_parse(struct ath11k_base *ab, struct ath11k
 	return 0;
 }
 
+static void ath11k_dp_ppdu_stats_flush_tlv_parse(struct ath11k_base *ab,
+					  struct htt_ppdu_stats_cmpltn_flush *msg)
+{
+	struct ieee80211_sta *sta;
+	struct ath11k_sta *arsta;
+	struct ath11k *ar;
+	struct ath11k_peer *peer = NULL;
+	struct ieee80211_tx_status status;
+	struct ieee80211_rate_status status_rate = { 0 };
+	int i;
+
+	if (!ab->nss.mesh_nss_offload_enabled)
+		return;
+
+	rcu_read_lock();
+
+	spin_lock_bh(&ab->base_lock);
+
+	/* This TLV arrives with pdev_id 0, so it names no radio: the peer
+	 * lists are per-radio, so search them all.
+	 */
+	for (i = 0; i < ab->num_radios; i++) {
+		peer = ath11k_peer_find_by_id(ab->pdevs[i].ar, msg->sw_peer_id);
+		if (peer)
+			break;
+	}
+
+	if (!peer || !peer->sta || !peer->vif)
+		goto exit;
+
+	if (peer->vif->type != NL80211_IFTYPE_MESH_POINT)
+		goto exit;
+
+	if (ether_addr_equal(peer->addr, peer->vif->addr))
+		goto exit;
+
+	sta = peer->sta;
+	arsta = ath11k_sta_to_arsta(sta);
+
+	memset(&status, 0, sizeof(status));
+
+	status.sta = sta;
+	status_rate.rate_idx = arsta->last_txrate;
+
+	status.rates = &status_rate;
+	status.mpdu_fail = FIELD_GET(HTT_PPDU_STATS_CMPLTN_FLUSH_INFO_NUM_MPDU,
+				     msg->info);
+	ar = arsta->arvif->ar;
+	ieee80211s_update_metric_ppdu(ar->hw, &status);
+
+exit:
+	spin_unlock_bh(&ab->base_lock);
+	rcu_read_unlock();
+}
+
+static int ath11k_htt_tlv_ppdu_soc_stats_parse(struct ath11k_base *ab, struct ath11k *ar,
+					       u16 tag, u16 len, const void *ptr,
+					       void *data)
+{
+	switch (tag) {
+	case HTT_PPDU_STATS_TAG_USR_COMPLTN_FLUSH:
+		if (len < sizeof(struct htt_ppdu_stats_cmpltn_flush)) {
+			ath11k_warn(ab, "Invalid len %d for the tag 0x%x\n",
+				    len, tag);
+			return -EINVAL;
+		}
+		ath11k_dp_ppdu_stats_flush_tlv_parse(ab, (struct htt_ppdu_stats_cmpltn_flush *)ptr);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static void
 ath11k_update_per_peer_tx_stats(struct ath11k *ar,
 				struct htt_ppdu_stats *ppdu_stats, u8 user)
@@ -1550,6 +1625,9 @@ ath11k_update_per_peer_tx_stats(struct ath11k *ar,
 	bool is_ampdu = false;
 
 	if (!(usr_stats->tlv_flags & BIT(HTT_PPDU_STATS_TAG_USR_RATE)))
+		return;
+
+	if (usr_stats->rate_stats_updated)
 		return;
 
 	if (usr_stats->tlv_flags & BIT(HTT_PPDU_STATS_TAG_USR_COMPLTN_COMMON))
@@ -1685,6 +1763,8 @@ ath11k_update_per_peer_tx_stats(struct ath11k *ar,
 			ath11k_debugfs_sta_add_tx_stats(arsta, peer_stats, rate_idx);
 	}
 
+	usr_stats->rate_stats_updated = true;
+
 	spin_unlock_bh(&ab->base_lock);
 	rcu_read_unlock();
 }
@@ -1805,6 +1885,69 @@ int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, struct ath11k *ar, const void
 	return 0;
 }
 
+static void
+ath11k_dp_rx_ppdu_stats_update_tx_comp_status(struct ath11k *ar,
+				       struct htt_ppdu_stats_info *ppdu_info)
+{
+	struct ath11k_base *ab = ar->ab;
+	struct ieee80211_sta *sta;
+	struct ath11k_sta *arsta;
+	struct ath11k_peer *peer = NULL;
+	struct htt_ppdu_user_stats* usr_stats = NULL;
+	struct ieee80211_tx_status status;
+	struct ieee80211_rate_status status_rate = { 0 };
+
+	u32 peer_id = 0;
+	int i;
+
+	lockdep_assert_held(&ar->data_lock);
+
+	if (!ab->nss.mesh_nss_offload_enabled)
+		return;
+
+	ath11k_htt_update_ppdu_stats(ar, &ppdu_info->ppdu_stats);
+
+	rcu_read_lock();
+
+	for (i = 0; i < ppdu_info->ppdu_stats.common.num_users; i++) {
+		usr_stats = &ppdu_info->ppdu_stats.user_stats[i];
+		peer_id = usr_stats->peer_id;
+		spin_lock_bh(&ab->base_lock);
+		peer = ath11k_peer_find_by_id(ar, peer_id);
+		if (!peer || !peer->sta || !peer->vif) {
+			spin_unlock_bh(&ab->base_lock);
+			continue;
+		}
+
+		if (peer->vif->type != NL80211_IFTYPE_MESH_POINT) {
+			spin_unlock_bh(&ab->base_lock);
+			goto exit;
+		}
+
+		if (ether_addr_equal(peer->addr, peer->vif->addr)) {
+			spin_unlock_bh(&ab->base_lock);
+			continue;
+		}
+
+		sta = peer->sta;
+		arsta = ath11k_sta_to_arsta(sta);
+
+		memset(&status, 0, sizeof(status));
+
+		status.sta = sta;
+		status_rate.rate_idx = arsta->last_txrate;
+		status.rates = &status_rate;
+		status.mpdu_succ = usr_stats->cmpltn_cmn.mpdu_success;
+
+		ieee80211s_update_metric_ppdu(ar->hw, &status);
+
+		spin_unlock_bh(&ab->base_lock);
+	}
+
+exit:
+	rcu_read_unlock();
+}
+
 static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 				      struct sk_buff *skb)
 {
@@ -1822,6 +1965,15 @@ static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 	len = FIELD_GET(HTT_T2H_PPDU_STATS_INFO_PAYLOAD_SIZE, msg->info);
 	pdev_id = FIELD_GET(HTT_T2H_PPDU_STATS_INFO_PDEV_ID, msg->info);
 	ppdu_id = msg->ppdu_id;
+
+	if (pdev_id == 0) {
+		ret = ath11k_dp_htt_tlv_iter(ab, NULL, msg->data, len,
+					     ath11k_htt_tlv_ppdu_soc_stats_parse,
+					     NULL);
+		if (ret)
+			ath11k_warn(ab, "failed to parse tlv %d\n", ret);
+		return ret;
+	}
 
 	rcu_read_lock();
 	ar = ath11k_mac_get_ar_by_pdev_id(ab, pdev_id);
@@ -1889,6 +2041,12 @@ static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 			spin_unlock_bh(&ab->base_lock);
 		}
 	}
+
+	/* Stats update for mesh interface used when nss-offload in mesh is enabled */
+	if ((ppdu_info->frame_type == HTT_STATS_PPDU_FTYPE_DATA &&
+	    (ppdu_info->tlv_bitmap & (1 << HTT_PPDU_STATS_TAG_USR_RATE)) &&
+	    ppdu_info->tlv_bitmap & (1 << HTT_PPDU_STATS_TAG_USR_COMPLTN_COMMON)))
+		ath11k_dp_rx_ppdu_stats_update_tx_comp_status(ar, ppdu_info);
 
 out_unlock_data:
 	spin_unlock_bh(&ar->data_lock);
