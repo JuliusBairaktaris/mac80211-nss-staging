@@ -19,6 +19,7 @@
 #include <linux/suspend.h>
 #include <linux/of.h>
 
+#include "fw.h"
 #include "qmi.h"
 #include "htc.h"
 #include "wmi.h"
@@ -34,7 +35,6 @@
 #include "spectral.h"
 #include "wow.h"
 #include "rx_desc.h"
-#include "fw.h"
 #include "coredump.h"
 
 #define SM(_v, _f) (((_v) << _f##_LSB) & _f##_MASK)
@@ -364,6 +364,16 @@ struct ath11k_reg_tpc_power_info {
 	struct ath11k_chan_power_info chan_power_info[ATH11K_NUM_PWR_LEVELS];
 };
 
+#define ATH11K_STATS_MGMT_FRM_TYPE_MAX 16
+
+struct ath11k_mgmt_frame_stats {
+	u32 tx_succ_cnt[ATH11K_STATS_MGMT_FRM_TYPE_MAX];
+	u32 tx_fail_cnt[ATH11K_STATS_MGMT_FRM_TYPE_MAX];
+	u32 rx_cnt[ATH11K_STATS_MGMT_FRM_TYPE_MAX];
+	u32 tx_compl_succ[ATH11K_STATS_MGMT_FRM_TYPE_MAX];
+	u32 tx_compl_fail[ATH11K_STATS_MGMT_FRM_TYPE_MAX];
+};
+
 struct ath11k_vif {
 	u32 vdev_id;
 	enum wmi_vdev_type vdev_type;
@@ -422,7 +432,7 @@ struct ath11k_vif {
 	bool reinstall_group_keys;
 
 	struct ath11k_reg_tpc_power_info reg_tpc_info;
-
+	struct ath11k_mgmt_frame_stats mgmt_stats;
 	/* Must be last - ends in a flexible-array member.
 	 *
 	 * FIXME: Driver should not copy struct ieee80211_chanctx_conf,
