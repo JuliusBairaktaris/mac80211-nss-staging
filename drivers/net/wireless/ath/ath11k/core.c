@@ -2526,10 +2526,10 @@ void ath11k_core_pre_reconfigure_recovery(struct ath11k_base *ab)
 		ar->monitor_vdev_id = -1;
 		clear_bit(ATH11K_FLAG_MONITOR_STARTED, &ar->monitor_flags);
 		clear_bit(ATH11K_FLAG_MONITOR_VDEV_CREATED, &ar->monitor_flags);
+		wake_up(&ar->peer_mapping_wq);
 	}
 
 	wake_up(&ab->wmi_ab.tx_credits_wq);
-	wake_up(&ab->peer_mapping_wq);
 
 	reinit_completion(&ab->driver_recovery);
 }
@@ -2880,7 +2880,6 @@ struct ath11k_base *ath11k_core_alloc(struct device *dev, size_t priv_size,
 		goto err_free_wq;
 
 	mutex_init(&ab->core_lock);
-	mutex_init(&ab->tbl_mtx_lock);
 	mutex_init(&ab->base_ast_lock);
 	spin_lock_init(&ab->base_lock);
 	mutex_init(&ab->vdev_id_11d_lock);
@@ -2888,8 +2887,6 @@ struct ath11k_base *ath11k_core_alloc(struct device *dev, size_t priv_size,
 	init_completion(&ab->reconfigure_complete);
 	init_completion(&ab->recovery_start);
 
-	INIT_LIST_HEAD(&ab->peers);
-	init_waitqueue_head(&ab->peer_mapping_wq);
 	init_waitqueue_head(&ab->wmi_ab.tx_credits_wq);
 	init_waitqueue_head(&ab->qmi.cold_boot_waitq);
 	INIT_WORK(&ab->restart_work, ath11k_core_restart);

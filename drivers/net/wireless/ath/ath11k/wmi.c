@@ -7632,10 +7632,12 @@ static void ath11k_wmi_event_peer_sta_ps_state_chg(struct ath11k_base *ab,
 	struct ieee80211_sta *sta;
 	struct ath11k_peer *peer;
 	struct ath11k *ar;
+	struct ath11k_pdev *pdev;
 	struct ath11k_sta *arsta;
 	const void **tb;
 	enum ath11k_wmi_peer_ps_state peer_previous_ps_state;
 	int ret;
+	int i;
 
 	tb = ath11k_wmi_tlv_parse_alloc(ab, skb, GFP_ATOMIC);
 	if (IS_ERR(tb)) {
@@ -7659,69 +7661,65 @@ static void ath11k_wmi_event_peer_sta_ps_state_chg(struct ath11k_base *ab,
 
 	rcu_read_lock();
 
+
 	spin_lock_bh(&ab->base_lock);
-
-	peer = ath11k_peer_find_by_addr(ab, ev->peer_macaddr.addr);
-
-	if (!peer) {
-		spin_unlock_bh(&ab->base_lock);
-		ath11k_warn(ab, "peer not found %pM\n", ev->peer_macaddr.addr);
-		goto exit;
-	}
-
-	ar = ath11k_mac_get_ar_by_vdev_id(ab, peer->vdev_id);
-
-	if (!ar) {
-		spin_unlock_bh(&ab->base_lock);
-		ath11k_warn(ab, "invalid vdev id in peer sta ps state change ev %d",
-			    peer->vdev_id);
-
-		goto exit;
-	}
-
-	sta = peer->sta;
-
-	spin_unlock_bh(&ab->base_lock);
-
-	if (!sta) {
-		ath11k_warn(ab, "failed to find station entry %pM\n",
-			    ev->peer_macaddr.addr);
-		goto exit;
-	}
-
-	arsta = ath11k_sta_to_arsta(sta);
-
-	spin_lock_bh(&ar->data_lock);
-
-	peer_previous_ps_state = arsta->peer_ps_state;
-	arsta->peer_ps_state = ev->peer_ps_state;
-	arsta->peer_current_ps_valid = !!ev->peer_ps_valid;
-
-	if (test_bit(WMI_TLV_SERVICE_PEER_POWER_SAVE_DURATION_SUPPORT,
-		     ar->ab->wmi_ab.svc_map)) {
-		if (!(ev->ps_supported_bitmap & WMI_PEER_PS_VALID) ||
-		    !(ev->ps_supported_bitmap & WMI_PEER_PS_STATE_TIMESTAMP) ||
-		    !ev->peer_ps_valid)
-			goto out;
-
-		if (arsta->peer_ps_state == WMI_PEER_PS_STATE_ON) {
-			arsta->ps_start_time = ev->peer_ps_timestamp;
-			arsta->ps_start_jiffies = jiffies;
-		} else if (arsta->peer_ps_state == WMI_PEER_PS_STATE_OFF &&
-			   peer_previous_ps_state == WMI_PEER_PS_STATE_ON) {
-			arsta->ps_total_duration = arsta->ps_total_duration +
-					(ev->peer_ps_timestamp - arsta->ps_start_time);
+	for (i = 0; i < ab->num_radios; i++) {
+		pdev = &ab->pdevs[i];
+		ar = pdev->ar;
+		peer = ath11k_peer_find_by_addr(ar, ev->peer_macaddr.addr);
+		if (!peer) {
+			continue;
 		}
 
-		if (ar->ps_timekeeper_enable)
-			trace_ath11k_ps_timekeeper(ar, ev->peer_macaddr.addr,
-						   ev->peer_ps_timestamp,
-						   arsta->peer_ps_state);
+		ar = ath11k_mac_get_ar_by_vdev_id(ab, peer->vdev_id);
+
+		if (!ar) {
+			ath11k_warn(ab, "invalid vdev id in peer sta ps state change ev %d", peer->vdev_id);
+
+			goto exit;
+		}
+
+		sta = peer->sta;
+
+		spin_unlock_bh(&ab->base_lock);
+
+		if (!sta) {
+			ath11k_warn(ab, "failed to find station entry %pM\n", ev->peer_macaddr.addr);
+			goto exit;
+		}
+
+		arsta = ath11k_sta_to_arsta(sta);
+
+		spin_lock_bh(&ar->data_lock);
+
+		peer_previous_ps_state = arsta->peer_ps_state;
+		arsta->peer_ps_state = ev->peer_ps_state;
+		arsta->peer_current_ps_valid = !!ev->peer_ps_valid;
+
+		if (test_bit(WMI_TLV_SERVICE_PEER_POWER_SAVE_DURATION_SUPPORT, ar->ab->wmi_ab.svc_map)) {
+			if (!(ev->ps_supported_bitmap & WMI_PEER_PS_VALID) ||
+			    !(ev->ps_supported_bitmap & WMI_PEER_PS_STATE_TIMESTAMP) || !ev->peer_ps_valid) {
+				spin_unlock_bh(&ar->data_lock);
+				goto exit;
+			}
+
+			if (arsta->peer_ps_state == WMI_PEER_PS_STATE_ON) {
+				arsta->ps_start_time = ev->peer_ps_timestamp;
+				arsta->ps_start_jiffies = jiffies;
+			} else if (arsta->peer_ps_state == WMI_PEER_PS_STATE_OFF &&
+				   peer_previous_ps_state == WMI_PEER_PS_STATE_ON) {
+				arsta->ps_total_duration =
+					arsta->ps_total_duration + (ev->peer_ps_timestamp - arsta->ps_start_time);
+			}
+
+			if (ar->ps_timekeeper_enable)
+				trace_ath11k_ps_timekeeper(ar, ev->peer_macaddr.addr, ev->peer_ps_timestamp, arsta->peer_ps_state);
+		}
+		spin_unlock_bh(&ar->data_lock);
 	}
 
-out:
-	spin_unlock_bh(&ar->data_lock);
 exit:
+	spin_unlock_bh(&ab->base_lock);
 	rcu_read_unlock();
 	kfree(tb);
 }
@@ -7836,9 +7834,9 @@ static void ath11k_mgmt_rx_event(struct ath11k_base *ab, struct sk_buff *skb)
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find_by_addr(ab, hdr->addr1);
+	peer = ath11k_peer_find_by_addr(ar, hdr->addr1);
 	if(!peer)
-		peer = ath11k_peer_find_by_addr(ab, hdr->addr3);
+		peer = ath11k_peer_find_by_addr(ar, hdr->addr3);
 	if (!peer) {
 		spin_unlock_bh(&ab->base_lock);
 		goto skip_mgmt_stats;
@@ -8067,8 +8065,10 @@ static void ath11k_peer_sta_kickout_event(struct ath11k_base *ab, struct sk_buff
 	struct wmi_peer_sta_kickout_arg arg = {};
 	struct ieee80211_sta *sta;
 	struct ath11k_peer *peer;
+	struct ath11k_peer *save_peer;
 	struct ath11k *ar;
-	u32 vdev_id;
+	struct ath11k *save_ar;
+	int i;
 
 	if (ath11k_pull_peer_sta_kickout_ev(ab, skb, &arg) != 0) {
 		ath11k_warn(ab, "failed to extract peer sta kickout event");
@@ -8079,40 +8079,30 @@ static void ath11k_peer_sta_kickout_event(struct ath11k_base *ab, struct sk_buff
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find_by_addr(ab, arg.mac_addr);
+	for (i = 0; i < ab->num_radios; i++) {
+		struct ath11k_pdev *pdev = &ab->pdevs[i];
+		ar = pdev->ar;
+		peer = ath11k_peer_find_by_addr(ar, arg.mac_addr);
+		if (!peer) {
+			continue;
+		}
+		save_peer = peer;
+		save_ar = ar;
+		sta = ieee80211_find_sta_by_ifaddr(ar->hw, arg.mac_addr, NULL);
+		if (!sta) {
+			    continue;
+		}
 
-	if (!peer) {
-		ath11k_warn(ab, "peer not found %pM\n",
-			    arg.mac_addr);
-		spin_unlock_bh(&ab->base_lock);
-		goto exit;
+		ath11k_dbg(ab, ATH11K_DBG_WMI, "event peer sta kickout %pM", arg.mac_addr);
+
+		ieee80211_report_low_ack(sta, 10);
 	}
-
-	vdev_id = peer->vdev_id;
+	if (!sta && save_peer) {
+		ath11k_warn(ab, "Spurious quick kickout for STA %pM but found in peer table\n", arg.mac_addr);
+		ath11k_dp_peer_cleanup(save_ar, save_peer->vdev_id, arg.mac_addr);
+	}
 
 	spin_unlock_bh(&ab->base_lock);
-
-	ar = ath11k_mac_get_ar_by_vdev_id(ab, vdev_id);
-	if (!ar) {
-		ath11k_warn(ab, "invalid vdev id in peer sta kickout ev %d",
-			    peer->vdev_id);
-		goto exit;
-	}
-
-	sta = ieee80211_find_sta_by_ifaddr(ar->hw,
-					   arg.mac_addr, NULL);
-	if (!sta) {
-		ath11k_warn(ab, "Spurious quick kickout for STA %pM\n",
-			    arg.mac_addr);
-		goto exit;
-	}
-
-	ath11k_dbg(ab, ATH11K_DBG_WMI, "event peer sta kickout %pM",
-		   arg.mac_addr);
-
-	ieee80211_report_low_ack(sta, 10);
-
-exit:
 	rcu_read_unlock();
 }
 
