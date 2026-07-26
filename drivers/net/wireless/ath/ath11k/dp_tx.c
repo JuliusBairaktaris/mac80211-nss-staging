@@ -465,7 +465,7 @@ ath11k_dp_tx_htt_tx_complete_buf(struct ath11k_base *ab,
 		return;
 	}
 	if (unlikely(!skb_cb->vif)) {
-		dev_kfree_skb_any(msdu);
+		ieee80211_free_txskb(ar->hw, msdu);
 		return;
 	}
 
