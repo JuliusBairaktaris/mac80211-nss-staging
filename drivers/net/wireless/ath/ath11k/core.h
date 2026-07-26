@@ -438,6 +438,7 @@ struct ath11k_vif {
 #ifdef CPTCFG_ATH11K_NSS_SUPPORT
 	struct arvif_nss nss;
 #endif
+	struct list_head ap_vlan_arvifs;
 	/* Must be last - ends in a flexible-array member.
 	 *
 	 * FIXME: Driver should not copy struct ieee80211_chanctx_conf,
