@@ -1508,4 +1508,16 @@ struct hal_rx_desc {
 #define RU_484 18
 #define RU_996 37
 
+#define HAL_RX_MPDU_INFO_PN_GET_BYTE1(__val) \
+	FIELD_GET(GENMASK(7, 0), __le32_to_cpu(__val))
+
+#define HAL_RX_MPDU_INFO_PN_GET_BYTE2(__val) \
+	FIELD_GET(GENMASK(15, 8), __le32_to_cpu(__val))
+
+#define HAL_RX_MPDU_INFO_PN_GET_BYTE3(__val) \
+	FIELD_GET(GENMASK(23, 16), __le32_to_cpu(__val))
+
+#define HAL_RX_MPDU_INFO_PN_GET_BYTE4(__val) \
+	FIELD_GET(GENMASK(31, 24), __le32_to_cpu(__val))
+
 #endif /* ATH11K_RX_DESC_H */
