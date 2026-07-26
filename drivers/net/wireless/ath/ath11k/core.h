@@ -952,6 +952,11 @@ enum ath11k_pm_policy {
 	ATH11K_PM_WOW,
 };
 
+struct ath11k_num_vdevs_peers {
+	u32 num_vdevs;
+	u32 num_peers;
+};
+
 /* Master structure to hold the hw data which may be used in core module */
 struct ath11k_base {
 	enum ath11k_hw_rev hw_rev;
@@ -1114,6 +1119,8 @@ struct ath11k_base {
 	} fw;
 
 	struct completion restart_completed;
+
+	atomic_t num_max_allowed;
 
 #ifdef CPTCFG_NL80211_TESTMODE
 	struct {
