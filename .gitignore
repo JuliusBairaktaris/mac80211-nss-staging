@@ -1,0 +1,4 @@
+.pc/
+patches/
+.prepared*
+.quilt_used
