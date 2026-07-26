@@ -33,6 +33,30 @@ ath11k_nss_get_vdev_opmode(struct ath11k_vif *arvif)
 	return ATH11K_NSS_OPMODE_UNKNOWN;
 }
 
+static struct ath11k_vif *ath11k_nss_get_arvif_from_dev(struct net_device *dev)
+{
+	struct wireless_dev *wdev;
+	struct ieee80211_vif *vif;
+	struct ath11k_vif *arvif;
+
+	if (!dev)
+		return NULL;
+
+	wdev = dev->ieee80211_ptr;
+	if (!wdev)
+		return NULL;
+
+	vif = wdev_to_ieee80211_vif(wdev);
+	if (!vif)
+		return NULL;
+
+	arvif = (struct ath11k_vif *)vif->drv_priv;
+	if (!arvif)
+		return NULL;
+
+	return arvif;
+}
+
 static void ath11k_nss_wifili_stats_sync(struct ath11k_base *ab,
 					 struct nss_wifili_stats_sync_msg *wlsoc_stats)
 {
@@ -959,35 +983,19 @@ ath11k_nss_vdev_data_receive(struct net_device *dev, struct sk_buff *skb,
 			     __attribute__((unused)) struct napi_struct *napi)
 {
 	struct wireless_dev *wdev = NULL;
-	struct ieee80211_vif *vif = NULL;
 	struct ath11k_vif *arvif;
 	struct ath11k_base *ab;
 	bool eth_decap = false;
 	int data_offs = 0;
 	int ret;
 
-	if (!dev) {
-		dev_kfree_skb_any(skb);
-		return;
-	}
-
-	wdev = dev->ieee80211_ptr;
-	if (!wdev) {
-		dev_kfree_skb_any(skb);
-		return;
-	}
-
-	vif = wdev_to_ieee80211_vif(wdev);
-	if (!vif) {
-		dev_kfree_skb_any(skb);
-		return;
-	}
-
-	arvif = (struct ath11k_vif *)vif->drv_priv;
+	arvif = ath11k_nss_get_arvif_from_dev(dev);
 	if (!arvif) {
 		dev_kfree_skb_any(skb);
 		return;
 	}
+
+	wdev = ieee80211_vif_to_wdev_relaxed(arvif->vif);
 
 	ab = arvif->ar->ab;
 
@@ -997,7 +1005,7 @@ ath11k_nss_vdev_data_receive(struct net_device *dev, struct sk_buff *skb,
 	ath11k_dbg_dump(ab, ATH11K_DBG_DP_RX, "", "dp rx msdu from nss: ",
 			skb->data, skb->len);
 
-	if ((vif->type == NL80211_IFTYPE_STATION && wdev->use_4addr) &&
+	if ((arvif->vif->type == NL80211_IFTYPE_STATION && wdev->use_4addr) &&
 	     ath11k_nss_vdev_data_receive_mec_check(arvif->ar, skb)) {
 		dev_kfree_skb_any(skb);
 		return;
