@@ -44,6 +44,8 @@ bool ath11k_ftm_mode;
 module_param_named(ftm_mode, ath11k_ftm_mode, bool, 0444);
 MODULE_PARM_DESC(ftm_mode, "Boots up in factory test mode");
 
+static const struct ath11k_num_vdevs_peers ath11k_vdevs_peers[];
+
 static struct ath11k_hw_params ath11k_hw_params[] = {
 	{
 		.hw_rev = ATH11K_HW_IPQ8074,
@@ -97,7 +99,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = true,
 		.coldboot_cal_ftm = true,
 		.cbcal_restart_fw = true,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 16 + 1,
 		.num_peers = 512,
 		.supports_suspend = false,
@@ -128,6 +130,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.tcl_ring_retry = true,
 		.tx_ring_size = DP_TCL_DATA_RING_SIZE,
 		.smp2p_wow_exit = false,
+		.num_vdevs_peers = ath11k_vdevs_peers,
 		.support_dual_stations = false,
 		.pdev_suspend = false,
 		.cfr_support = true,
@@ -183,7 +186,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = false,
 		.coldboot_cal_ftm = false,
 		.cbcal_restart_fw = true,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 16 + 1,
 		.num_peers = 512,
 		.supports_suspend = false,
@@ -215,6 +218,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.tx_ring_size = DP_TCL_DATA_RING_SIZE,
 		.smp2p_wow_exit = false,
 		.support_fw_mac_sequence = false,
+		.num_vdevs_peers = ath11k_vdevs_peers,
 		.support_dual_stations = false,
 		.pdev_suspend = false,
 		.cfr_support = false,
@@ -272,7 +276,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = false,
 		.coldboot_cal_ftm = false,
 		.cbcal_restart_fw = false,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 4,
 		.num_peers = 512,
 		.supports_suspend = true,
@@ -393,6 +397,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.tx_ring_size = DP_TCL_DATA_RING_SIZE,
 		.smp2p_wow_exit = false,
 		.support_fw_mac_sequence = false,
+		.num_vdevs_peers = ath11k_vdevs_peers,
 		.support_dual_stations = false,
 		.pdev_suspend = false,
 		.cfr_support = false,
@@ -540,7 +545,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = false,
 		.coldboot_cal_ftm = false,
 		.cbcal_restart_fw = false,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 4,
 		.num_peers = 512,
 		.supports_suspend = true,
@@ -628,7 +633,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = true,
 		.coldboot_cal_ftm = true,
 		.cbcal_restart_fw = false,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 3,
 		.num_peers = 512,
 		.supports_suspend = false,
@@ -710,7 +715,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.supports_monitor = false,
 		.supports_sta_ps = false,
 		.supports_shadow_regs = false,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 16 + 1,
 		.num_peers = 512,
 		.supports_regdb = false,
@@ -745,6 +750,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.tx_ring_size = DP_TCL_DATA_RING_SIZE,
 		.smp2p_wow_exit = false,
 		.support_fw_mac_sequence = false,
+		.num_vdevs_peers = ath11k_vdevs_peers,
 		.support_dual_stations = false,
 		.pdev_suspend = false,
 		.cfr_support = false,
@@ -891,7 +897,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.coldboot_cal_mm = false,
 		.coldboot_cal_ftm = false,
 		.cbcal_restart_fw = false,
-		.fw_mem_mode = 0,
+		.fw_mem_mode = ATH11K_QMI_TARGET_MEM_MODE,
 		.num_vdevs = 4,
 		.num_peers = 512,
 		.supports_suspend = true,
@@ -926,6 +932,7 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.tx_ring_size = DP_TCL_DATA_RING_SIZE,
 		.smp2p_wow_exit = false,
 		.support_fw_mac_sequence = true,
+		.num_vdevs_peers = ath11k_vdevs_peers,
 		.support_dual_stations = true,
 		.pdev_suspend = false,
 		.cfr_support = true,
@@ -2788,6 +2795,21 @@ static int ath11k_core_pm_notify(struct notifier_block *nb,
 
 	return NOTIFY_OK;
 }
+
+static const struct ath11k_num_vdevs_peers ath11k_vdevs_peers[] = {
+	{
+		.num_vdevs = (16 + 1),
+		.num_peers = 512,
+	},
+	{
+		.num_vdevs = (8 + 1),
+		.num_peers = 128,
+	},
+	{
+		.num_vdevs = 8,
+		.num_peers = 128,
+	},
+};
 
 static int ath11k_core_pm_notifier_register(struct ath11k_base *ab)
 {
