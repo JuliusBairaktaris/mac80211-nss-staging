@@ -5774,7 +5774,9 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 	if (!num_buffs_reaped)
 		goto exit;
 
-	memset(ppdu_info, 0, sizeof(*ppdu_info));
+	if (!ppdu_info->ppdu_continuation)
+		memset(ppdu_info, 0, sizeof(*ppdu_info));
+
 	ppdu_info->peer_id = HAL_INVALID_PEERID;
 
 	while ((skb = __skb_dequeue(&skb_list))) {
@@ -5792,7 +5794,6 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 		if (log_type != ATH11K_PKTLOG_TYPE_INVALID)
 			trace_ath11k_htt_rxdesc(ar, skb->data, log_type, rx_buf_sz);
 
-		memset(ppdu_info, 0, sizeof(*ppdu_info));
 		ppdu_info->peer_id = HAL_INVALID_PEERID;
 		hal_status = ath11k_hal_rx_parse_mon_status(ab, ppdu_info, skb);
 
@@ -5811,6 +5812,7 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 		if (ppdu_info->peer_id == HAL_INVALID_PEERID ||
 		    hal_status != HAL_RX_MON_STATUS_PPDU_DONE) {
 			dev_kfree_skb_any(skb);
+			ppdu_info->ppdu_continuation = true;
 			continue;
 		}
 

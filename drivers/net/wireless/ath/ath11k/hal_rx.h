@@ -214,6 +214,7 @@ struct hal_rx_mon_ppdu_info {
 	u8 rxpcu_filter_pass;
 	char rssi_chain[8][8];
 	struct hal_rx_user_status userstats;
+	bool ppdu_continuation;
 };
 
 #define HAL_RX_PPDU_START_INFO0_PPDU_ID		GENMASK(15, 0)
