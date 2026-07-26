@@ -33,6 +33,7 @@ struct ath11k_hif_ops {
 	void (*get_ce_msi_idx)(struct ath11k_base *ab, u32 ce_id, u32 *msi_idx);
 	void (*coredump_download)(struct ath11k_base *ab);
 	void (*config_static_window)(struct ath11k_base *ab);
+	u32 (*get_window_offset)(struct ath11k_base *ab, u32 offset);
 };
 
 static inline void ath11k_hif_ce_irq_enable(struct ath11k_base *ab)
@@ -143,6 +144,14 @@ static inline void ath11k_get_msi_address(struct ath11k_base *ab, u32 *msi_addr_
 		return;
 
 	ab->hif.ops->get_msi_address(ab, msi_addr_lo, msi_addr_hi);
+}
+
+static inline u32 ath11k_hif_get_window_offset(struct ath11k_base *ab, u32 offset)
+{
+	if (ab->hif.ops->get_window_offset)
+		return ab->hif.ops->get_window_offset(ab, offset);
+
+	return offset;
 }
 
 static inline void ath11k_get_ce_msi_idx(struct ath11k_base *ab, u32 ce_id,
