@@ -142,6 +142,17 @@ int ath11k_dp_tx(struct ath11k *ar, struct ath11k_vif *arvif,
 		     !ieee80211_is_data(hdr->frame_control)))
 		return -EOPNOTSUPP;
 
+	/*
+	 * During firmware crash recovery ath11k_core_reconfigure_on_crash() calls
+	 * ath11k_dp_free(), releasing the DP tx_ring/idr_pool and the TCL srng, while
+	 * ATH11K_FLAG_CRASH_FLUSH is still set. ieee80211_stop_queues() does not fully
+	 * quiesce data TX, so a frame can still reach ath11k_dp_tx() in that window and
+	 * NULL-deref the freed tx_ring->idr_pool (and, further in, the cleared TCL srng).
+	 * Drop it, as ath11k_ce_send() already does for the WMI path.
+	 */
+	if (unlikely(test_bit(ATH11K_FLAG_CRASH_FLUSH, &ab->dev_flags)))
+		return -ESHUTDOWN;
+
 	max_tx_ring = ab->hw_params.max_tx_ring;
 
 #ifdef CPTCFG_ATH11K_MEM_PROFILE_512M
