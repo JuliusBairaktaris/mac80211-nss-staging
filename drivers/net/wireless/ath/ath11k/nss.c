@@ -3384,6 +3384,13 @@ static int ath11k_nss_stop(struct ath11k_base *ab)
 	nss_tx_status_t status;
 	int ret;
 
+	/* Cold-boot calibration restarts the Q6 through pre_reconfigure before
+	 * ath11k_nss_init_soc() has registered wifili, when if_num is still 0
+	 * and the message is rejected as a non-wifili interface.
+	 */
+	if (!ab->nss.ctx)
+		return 0;
+
 	ath11k_dbg(ab, ATH11K_DBG_NSS, "NSS stop\n");
 	wlmsg = kzalloc(sizeof(struct nss_wifili_msg), GFP_ATOMIC);
 	if (!wlmsg)
@@ -3519,6 +3526,14 @@ int ath11k_nss_teardown(struct ath11k_base *ab)
 	ath11k_dbg(ab, ATH11K_DBG_NSS, "NSS Teardown Complete\n");
 
 	return 0;
+}
+
+int ath11k_nss_pre_reconfigure(struct ath11k_base *ab)
+{
+	if (!ab->nss.enabled)
+		return 0;
+
+	return ath11k_nss_stop(ab);
 }
 
 int ath11k_nss_setup(struct ath11k_base *ab)
