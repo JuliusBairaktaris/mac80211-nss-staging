@@ -1092,10 +1092,83 @@ static const struct file_operations fops_reset_rx_stats = {
 	.llseek = default_llseek,
 };
 
+static ssize_t ath11k_dbg_sta_dump_nss_stats(struct file *file,
+					     char __user *user_buf,
+					     size_t count, loff_t *ppos)
+{
+	struct ieee80211_sta *sta = file->private_data;
+	struct ath11k_sta *arsta = ath11k_sta_to_arsta(sta);
+	struct ath11k *ar = arsta->arvif->ar;
+	struct ath11k_peer *peer;
+	struct peer_stats stats;
+	const int size = 1024;
+	int len = 0, retval;
+	char *buf;
+
+	buf = kzalloc(size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	spin_lock_bh(&ar->ab->base_lock);
+	peer = ath11k_peer_find(ar, arsta->arvif->vdev_id, sta->addr);
+	if (!peer || !peer->nss.nss_stats) {
+		spin_unlock_bh(&ar->ab->base_lock);
+		kfree(buf);
+		return -ENOENT;
+	}
+	stats = *peer->nss.nss_stats;
+	spin_unlock_bh(&ar->ab->base_lock);
+
+	len += scnprintf(buf + len, size - len, "tx_packets %u\n", stats.tx_packets);
+	len += scnprintf(buf + len, size - len, "tx_bytes %u\n", stats.tx_bytes);
+	len += scnprintf(buf + len, size - len, "tx_retries %u\n", stats.tx_retries);
+	len += scnprintf(buf + len, size - len, "tx_failed %u\n", stats.tx_failed);
+	len += scnprintf(buf + len, size - len, "tx_amsdu %u\n", stats.tx_amsdu);
+	len += scnprintf(buf + len, size - len, "tx_non_amsdu %u\n", stats.tx_non_amsdu);
+	len += scnprintf(buf + len, size - len, "tx_ofdma %u\n", stats.tx_ofdma);
+	len += scnprintf(buf + len, size - len, "tx_failed_retries %u\n",
+			 stats.tx_failed_retries);
+	len += scnprintf(buf + len, size - len, "tx_multiple_retries %u\n",
+			 stats.tx_multiple_retries);
+#ifdef NSS_FIRMWARE_VERSION_12_5
+	len += scnprintf(buf + len, size - len, "tx_mpdu_retries %u\n",
+			 stats.tx_mpdu_retries);
+	len += scnprintf(buf + len, size - len, "tx_mpdu_total_retries %u\n",
+			 stats.tx_mpdu_total_retries);
+#endif
+	len += scnprintf(buf + len, size - len, "rx_packets %u\n", stats.rx_packets);
+	len += scnprintf(buf + len, size - len, "rx_bytes %u\n", stats.rx_bytes);
+	len += scnprintf(buf + len, size - len, "rx_dropped %u\n", stats.rx_dropped);
+	len += scnprintf(buf + len, size - len, "rx_amsdu %u\n", stats.rx_amsdu);
+	len += scnprintf(buf + len, size - len, "rx_non_amsdu %u\n", stats.rx_non_amsdu);
+	len += scnprintf(buf + len, size - len, "rx_retries %u\n", stats.rx_retries);
+	len += scnprintf(buf + len, size - len, "rx_intra_bss %u\n", stats.rx_intra_bss);
+	len += scnprintf(buf + len, size - len, "rx_intra_bss_fail %u\n",
+			 stats.rx_intra_bss_fail);
+	len += scnprintf(buf + len, size - len, "rx_mic_err %u\n", stats.rx_mic_err);
+	len += scnprintf(buf + len, size - len, "rx_decrypt_err %u\n",
+			 stats.rx_decrypt_err);
+
+	retval = simple_read_from_buffer(user_buf, count, ppos, buf, len);
+	kfree(buf);
+	return retval;
+}
+
+static const struct file_operations fops_nss_peer_stats = {
+	.read = ath11k_dbg_sta_dump_nss_stats,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 void ath11k_debugfs_sta_op_add(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 			       struct ieee80211_sta *sta, struct dentry *dir)
 {
 	struct ath11k *ar = hw->priv;
+
+	if (ar->ab->nss.enabled)
+		debugfs_create_file("nss_stats", 0400, dir, sta,
+				    &fops_nss_peer_stats);
 
 	if (ath11k_debugfs_is_extd_tx_stats_enabled(ar))
 		debugfs_create_file("tx_stats", 0400, dir, sta,
