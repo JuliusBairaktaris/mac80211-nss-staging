@@ -3519,6 +3519,18 @@ int ath11k_nss_teardown(struct ath11k_base *ab)
 	return 0;
 }
 
+int ath11k_nss_pre_reconfigure(struct ath11k_base *ab)
+{
+	/* Cold-boot calibration restarts the Q6 through this same path before
+	 * ath11k_nss_init_soc() has registered wifili, when if_num is still 0
+	 * and the stop is rejected as a non-wifili interface.
+	 */
+	if (!ab->nss.enabled || !ab->nss.ctx)
+		return 0;
+
+	return ath11k_nss_stop(ab);
+}
+
 int ath11k_nss_setup(struct ath11k_base *ab)
 {
 	int i;
