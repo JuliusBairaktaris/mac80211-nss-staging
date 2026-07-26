@@ -319,7 +319,7 @@ static void ath11k_nss_peer_mem_free(struct ath11k_base *ab, u32 peer_id)
 
 /*-----------------------------Events/Callbacks------------------------------*/
 
-void ath11k_nss_wifili_event_receive(struct ath11k_base *ab, struct nss_wifili_msg *msg)
+static void ath11k_nss_wifili_event_receive(struct ath11k_base *ab, struct nss_wifili_msg *msg)
 {
 	u32 msg_type = msg->cm.type;
 	enum nss_cmn_response response = msg->cm.response;
@@ -423,7 +423,7 @@ void ath11k_nss_wifili_event_receive(struct ath11k_base *ab, struct nss_wifili_m
 	}
 }
 
-void ath11k_nss_process_mic_error(struct ath11k_base *ab, struct sk_buff *skb)
+static void ath11k_nss_process_mic_error(struct ath11k_base *ab, struct sk_buff *skb)
 {
 	struct ath11k_vif *arvif;
 	struct ath11k *ar;
@@ -517,7 +517,7 @@ ath11k_nss_wifili_ext_callback_fn(struct ath11k_base *ab, struct sk_buff *skb,
 	}
 }
 
-void ath11k_nss_vdev_cfg_cb(void *app_data, struct nss_cmn_msg *msg)
+static void ath11k_nss_vdev_cfg_cb(void *app_data, struct nss_cmn_msg *msg)
 {
 	struct ath11k_vif *arvif = (struct ath11k_vif *)app_data;
 
@@ -3128,7 +3128,7 @@ void ath11k_nss_peer_stats_enable(struct ath11k *ar)
 			     ATH11K_NSS_STATS_ENABLE);
 }
 
-int ath11k_nss_pdev_init(struct ath11k_base *ab, int radio_id)
+static int ath11k_nss_pdev_init(struct ath11k_base *ab, int radio_id)
 {
 	struct ath11k *ar = ab->pdevs[radio_id].ar;
 	struct nss_wifili_pdev_init_msg *pdevmsg;
@@ -3262,7 +3262,7 @@ dealloc:
 /* TODO : Check if start, reset and stop messages can be done using single function as
  * body is similar, having it now for clarity */
 
-int ath11k_nss_start(struct ath11k_base *ab)
+static int ath11k_nss_start(struct ath11k_base *ab)
 {
 	struct nss_wifili_msg *wlmsg = NULL;
 	nss_wifili_msg_callback_t msg_cb;
@@ -3427,7 +3427,7 @@ free:
 	return ret;
 }
 
-int ath11k_nss_pdev_deinit(struct ath11k_base *ab, int radio_id)
+static int ath11k_nss_pdev_deinit(struct ath11k_base *ab, int radio_id)
 {
 	struct ath11k *ar = ab->pdevs[radio_id].ar;
 	struct nss_wifili_pdev_deinit_msg *deinit;
