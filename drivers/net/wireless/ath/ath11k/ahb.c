@@ -371,6 +371,20 @@ static void ath11k_ahb_ce_irqs_disable(struct ath11k_base *ab)
 	}
 }
 
+static void ath11k_ahb_ce_irq_disable_sync(struct ath11k_base *ab)
+{
+	/*
+	 * Once the firmware has crashed the copy engine register space
+	 * belongs to a subsystem TrustZone is tearing down; masking the
+	 * interrupt enable bits there would fault. Host side sync and
+	 * tasklet kill still have to run.
+	 */
+	if (!test_bit(ATH11K_FLAG_CRASH_FLUSH, &ab->dev_flags))
+		ath11k_ahb_ce_irqs_disable(ab);
+	ath11k_ahb_sync_ce_irqs(ab);
+	ath11k_ahb_kill_tasklets(ab);
+}
+
 static int ath11k_ahb_start(struct ath11k_base *ab)
 {
 	ath11k_ahb_ce_irqs_enable(ab);
@@ -403,10 +417,7 @@ static void ath11k_ahb_ext_irq_disable(struct ath11k_base *ab)
 
 static void ath11k_ahb_stop(struct ath11k_base *ab)
 {
-	if (!test_bit(ATH11K_FLAG_CRASH_FLUSH, &ab->dev_flags))
-		ath11k_ahb_ce_irqs_disable(ab);
-	ath11k_ahb_sync_ce_irqs(ab);
-	ath11k_ahb_kill_tasklets(ab);
+	ath11k_ahb_ce_irq_disable_sync(ab);
 	timer_delete_sync(&ab->rx_replenish_retry);
 	ath11k_ce_cleanup_pipes(ab);
 }
@@ -478,6 +489,10 @@ static void ath11k_ahb_free_irq(struct ath11k_base *ab)
 static void ath11k_ahb_ce_tasklet(struct tasklet_struct *t)
 {
 	struct ath11k_ce_pipe *ce_pipe = from_tasklet(ce_pipe, t, intr_tq);
+	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
+
+	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
+		return;
 
 	ath11k_ce_per_engine_service(ce_pipe->ab, ce_pipe->pipe_num);
 
@@ -487,6 +502,16 @@ static void ath11k_ahb_ce_tasklet(struct tasklet_struct *t)
 static irqreturn_t ath11k_ahb_ce_interrupt_handler(int irq, void *arg)
 {
 	struct ath11k_ce_pipe *ce_pipe = arg;
+	struct ath11k_ahb *ab_ahb = ath11k_ahb_priv(ce_pipe->ab);
+
+	/*
+	 * While the Q6 is stopped or booting, the WLAN CE register space
+	 * is not accessible; a read raises a synchronous external abort.
+	 * The remoteproc core marks the state before it starts the
+	 * TrustZone teardown, so skip the (edge triggered) interrupt.
+	 */
+	if (ab_ahb->tgt_rproc->state != RPROC_RUNNING)
+		return IRQ_HANDLED;
 
 	/* last interrupt received for this CE */
 	ce_pipe->timestamp = jiffies;
@@ -808,6 +833,8 @@ static const struct ath11k_hif_ops ath11k_ahb_hif_ops_ipq8074 = {
 	.map_service_to_pipe = ath11k_ahb_map_service_to_pipe,
 	.power_down = ath11k_ahb_power_down,
 	.power_up = ath11k_ahb_power_up,
+	.ce_irq_enable = ath11k_ahb_ce_irqs_enable,
+	.ce_irq_disable = ath11k_ahb_ce_irq_disable_sync,
 };
 
 static const struct ath11k_hif_ops ath11k_ahb_hif_ops_wcn6750 = {
