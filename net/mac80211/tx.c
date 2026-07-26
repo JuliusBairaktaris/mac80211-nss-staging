@@ -4795,7 +4795,7 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
 
 	ieee80211_aggr_check(sdata, sta, skb);
 
-	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) {
+	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD) && sta) {
 		tid = skb->priority & IEEE80211_QOS_CTL_TAG1D_MASK;
 
 		if (sta)
