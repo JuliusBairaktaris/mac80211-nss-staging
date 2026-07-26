@@ -64,6 +64,7 @@ struct hal_rx_user_status;
 /* Init Flags */
 #define WIFILI_NSS_CCE_DISABLED 0x1
 #define WIFILI_ADDTL_MEM_SEG_SET 0x000000002
+#define WIFILI_MULTISOC_THREAD_MAP_ENABLE 0x10
 
 /* ATH11K NSS PEER Info */
 /* Host memory allocated for peer info storage in nss */
@@ -115,6 +116,8 @@ enum ath11k_nss_vdev_cmd {
 
 /* Enables the MCBC exception in NSS fw, 1 = enable */
 #define ATH11K_NSS_ENABLE_MCBC_EXC	1
+
+#define WIFILI_SCHEME_ID_INVALID	-1
 
 enum ath11k_nss_opmode {
 	ATH11K_NSS_OPMODE_UNKNOWN,
@@ -215,6 +218,8 @@ struct ath11k_soc_nss {
 	/* Response to nss messages are stored here on msg callback
 	* used only in contention free messages during init */
 	int response;
+	/* if nss_wifili_thread_scheme_alloc successfully allocated thread scheme */
+	bool thread_scheme_allocated;
 	/* Below is used for identifying allocated tx descriptors */
 	dma_addr_t tx_desc_paddr[ATH11K_NSS_MAX_NUMBER_OF_PAGE];
 	uint32_t * tx_desc_vaddr[ATH11K_NSS_MAX_NUMBER_OF_PAGE];
