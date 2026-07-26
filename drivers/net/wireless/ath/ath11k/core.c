@@ -108,7 +108,8 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.supports_regdb = false,
 		.fix_l1ss = true,
 		.credit_flow = false,
-		.max_tx_ring = DP_TCL_NUM_RING_MAX,
+		/* In addition to TCL ring use TCL_CMD ring also for tx */
+		.max_tx_ring = DP_TCL_NUM_RING_MAX + 1,
 		.hal_params = &ath11k_hw_hal_params_ipq8074,
 		.supports_dynamic_smps_6ghz = false,
 		.alloc_cacheable_memory = true,
@@ -193,7 +194,8 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.supports_regdb = false,
 		.fix_l1ss = true,
 		.credit_flow = false,
-		.max_tx_ring = DP_TCL_NUM_RING_MAX,
+		/* In addition to TCL ring use TCL_CMD ring also for tx */
+		.max_tx_ring = DP_TCL_NUM_RING_MAX + 1,
 		.hal_params = &ath11k_hw_hal_params_ipq8074,
 		.supports_dynamic_smps_6ghz = false,
 		.alloc_cacheable_memory = true,
@@ -368,7 +370,8 @@ static struct ath11k_hw_params ath11k_hw_params[] = {
 		.supports_regdb = false,
 		.fix_l1ss = true,
 		.credit_flow = false,
-		.max_tx_ring = DP_TCL_NUM_RING_MAX,
+		/* In addition to TCL ring use TCL_CMD ring also for tx */
+		.max_tx_ring = DP_TCL_NUM_RING_MAX + 1,
 		.hal_params = &ath11k_hw_hal_params_ipq8074,
 		.supports_dynamic_smps_6ghz = true,
 		.alloc_cacheable_memory = true,
@@ -2733,6 +2736,9 @@ int ath11k_core_pre_init(struct ath11k_base *ab)
 
 	if (nss_offload)
 		ab->nss.stats_enabled = 1;
+
+	if (ab->nss.enabled && ab->hw_params.max_tx_ring > DP_TCL_NUM_RING_MAX)
+		ab->hw_params.max_tx_ring = DP_TCL_NUM_RING_MAX;
 
 	return 0;
 }
