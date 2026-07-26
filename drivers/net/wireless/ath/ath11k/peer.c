@@ -7,6 +7,7 @@
 #include "core.h"
 #include "peer.h"
 #include "debug.h"
+#include "nss.h"
 
 static struct ath11k_peer *ath11k_peer_find_list_by_id(struct ath11k_base *ab,
 						       int peer_id)
@@ -136,6 +137,8 @@ void ath11k_peer_map_event(struct ath11k_base *ab, u8 vdev_id, u16 peer_id,
 		ether_addr_copy(peer->addr, mac_addr);
 		list_add(&peer->list, &ab->peers);
 		wake_up(&ab->peer_mapping_wq);
+		if (ab->nss.enabled)
+			ath11k_nss_peer_create(ab, peer);
 	}
 
 	ath11k_dbg(ab, ATH11K_DBG_DP_HTT, "peer map vdev %d peer %pM id %d\n",
@@ -298,17 +301,13 @@ static int __ath11k_peer_delete(struct ath11k *ar, u32 vdev_id, const u8 *addr)
 
 	lockdep_assert_held(&ar->conf_mutex);
 
+	reinit_completion(&ar->peer_delete_done);
+	ath11k_nss_peer_delete(ar->ab, addr);
+
 	mutex_lock(&ab->tbl_mtx_lock);
 	spin_lock_bh(&ab->base_lock);
 
 	peer = ath11k_peer_find_by_addr(ab, addr);
-	/* Check if the found peer is what we want to remove.
-	 * While the sta is transitioning to another band we may
-	 * have 2 peer with the same addr assigned to different
-	 * vdev_id. Make sure we are deleting the correct peer.
-	 */
-	if (peer && peer->vdev_id == vdev_id)
-		ath11k_peer_rhash_delete(ab, peer);
 
 	/* Fallback to peer list search if the correct peer can't be found.
 	 * Skip the deletion of the peer from the rhash since it has already
@@ -327,10 +326,17 @@ static int __ath11k_peer_delete(struct ath11k *ar, u32 vdev_id, const u8 *addr)
 		return -EINVAL;
 	}
 
+	/* Check if the found peer is what we want to remove.
+	 * While the sta is transitioning to another band we may
+	 * have 2 peer with the same addr assigned to different
+	 * vdev_id. Make sure we are deleting the correct peer.
+	 */
+	if (peer && peer->vdev_id == vdev_id)
+		ath11k_peer_rhash_delete(ab, peer);
+
 	spin_unlock_bh(&ab->base_lock);
 	mutex_unlock(&ab->tbl_mtx_lock);
 
-	reinit_completion(&ar->peer_delete_done);
 
 	ret = ath11k_wmi_send_peer_delete_cmd(ar, addr, vdev_id);
 	if (ret) {

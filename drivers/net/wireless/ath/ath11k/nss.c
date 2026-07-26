@@ -8,6 +8,8 @@
 #include "nss.h"
 #include "core.h"
 #include "peer.h"
+#include "dp_rx.h"
+#include "dp_tx.h"
 #include "hif.h"
 #include "wmi.h"
 #include "../../../../../net/mac80211/sta_info.h"
@@ -478,7 +480,7 @@ deliver_amsdu:
 
 	/* create list containing all the subframes */
 	ieee80211_amsdu_to_8023s(skb, &subframe_list, NULL,
-				 vif->type, 0, NULL, NULL);
+				 vif->type, 0, NULL, NULL, 0);
 
 	/* This shouldn't happen, indicating error during defragmentation */
 	if (skb_queue_empty(&subframe_list))
@@ -673,12 +675,14 @@ drop:
 	return -EINVAL;
 }
 
-int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, int cmd, int val)
+int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, enum ath11k_nss_vdev_cmd nss_cmd,
+			    int val)
 {
 	struct nss_wifi_vdev_msg *vdev_msg = NULL;
 	struct nss_wifi_vdev_cmd_msg *vdev_cmd;
 	struct ath11k *ar = arvif->ar;
 	nss_tx_status_t status;
+	int cmd;
 
 	if (!ar->ab->nss.enabled)
 		return 0;
@@ -691,6 +695,22 @@ int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, int cmd, int val)
 	if (!vdev_msg)
 		return -ENOMEM;
 
+	switch(nss_cmd) {
+	case ATH11K_NSS_WIFI_VDEV_CFG_AP_BRIDGE_CMD:
+		cmd = NSS_WIFI_VDEV_CFG_AP_BRIDGE_CMD;
+		break;
+	case ATH11K_NSS_WIFI_VDEV_SECURITY_TYPE_CMD:
+		cmd = NSS_WIFI_VDEV_SECURITY_TYPE_CMD;
+		break;
+	case ATH11K_NSS_WIFI_VDEV_ENCAP_TYPE_CMD:
+		cmd = NSS_WIFI_VDEV_ENCAP_TYPE_CMD;
+		break;
+	case ATH11K_NSS_WIFI_VDEV_DECAP_TYPE_CMD:
+		cmd = NSS_WIFI_VDEV_DECAP_TYPE_CMD;
+		break;
+	default:
+		return -EINVAL;
+	}
 	/* TODO: Convert to function for conversion in case of many
 	 * such commands
 	 */
@@ -1152,7 +1172,6 @@ void ath11k_nss_update_sta_stats(struct station_info *sinfo,
 {
 	struct sta_info *stainfo;
 	struct ath11k_peer *peer;
-	int tid_idx;
 	struct ath11k *ar = arsta->arvif->ar;
 	struct ath11k_base *ab = ar->ab;
 
@@ -1246,6 +1265,9 @@ void ath11k_nss_update_sta_rxrate(struct hal_rx_mon_ppdu_info *ppdu_info,
 	if (!ab->nss.enabled)
 		return;
 
+	if (!ieee80211_is_data(__cpu_to_le16(ppdu_info->frame_control)))
+		return;
+
 	if (!peer->nss.nss_stats)
 		return;
 
@@ -1305,7 +1327,7 @@ void ath11k_nss_update_sta_rxrate(struct hal_rx_mon_ppdu_info *ppdu_info,
 		peer->nss.nss_stats->rxrate.mcs = mcs;
 		peer->nss.nss_stats->rxrate.flags = RATE_INFO_FLAGS_HE_MCS;
 		peer->nss.nss_stats->rxrate.he_dcm = ppdu_info->dcm;
-		peer->nss.nss_stats->rxrate.he_gi = ath11k_he_gi_to_nl80211_he_gi(ppdu_info->gi);
+		peer->nss.nss_stats->rxrate.he_gi = ath11k_mac_he_gi_to_nl80211_he_gi(ppdu_info->gi);
 		peer->nss.nss_stats->rxrate.he_ru_alloc = ppdu_info->ru_alloc;
 		break;
 	}
