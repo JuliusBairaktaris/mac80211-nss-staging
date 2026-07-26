@@ -473,6 +473,17 @@ static struct sk_buff *ath11k_ce_completed_send_next(struct ath11k_ce_pipe *pipe
 
 	spin_lock_bh(&srng->lock);
 
+	/*
+	 * During a firmware crash storm ath11k_ce_cleanup_pipes() can call
+	 * this on a CE srng that hal_srng_clear() zeroed and that recovery
+	 * has not rebuilt; ath11k_hal_srng_access_begin() would deref a NULL
+	 * tp_addr. Bail as for an empty ring.
+	 */
+	if (unlikely(!srng->u.src_ring.tp_addr)) {
+		skb = ERR_PTR(-EIO);
+		goto err_unlock;
+	}
+
 	ath11k_hal_srng_access_begin(ab, srng);
 
 	desc = ath11k_hal_srng_src_reap_next(ab, srng);
@@ -750,6 +761,20 @@ int ath11k_ce_send(struct ath11k_base *ab, struct sk_buff *skb, u8 pipe_id,
 	nentries_mask = pipe->src_ring->nentries_mask;
 
 	srng = &ab->hal.srng_list[pipe->src_ring->hal_ring_id];
+
+	/*
+	 * During firmware-crash recovery ath11k_hal_srng_clear() memsets the
+	 * srng_list and ATH11K_FLAG_CRASH_FLUSH is cleared before the copy-engine
+	 * srng is rebuilt in ath11k_core_qmi_firmware_ready().  A send racing into
+	 * that window would dereference the NULL src_ring.tp_addr in
+	 * ath11k_hal_srng_access_begin().  Test that exact field: ath11k_hal_srng_setup()
+	 * sets ->initialized before ->tp_addr (unbarriered), so an ->initialized check
+	 * would still race the rebuild.  Bail until the ring pointer is valid.
+	 */
+	if (unlikely(!srng->u.src_ring.tp_addr)) {
+		spin_unlock_bh(&ab->ce.ce_lock);
+		return -ESHUTDOWN;
+	}
 
 	spin_lock_bh(&srng->lock);
 
