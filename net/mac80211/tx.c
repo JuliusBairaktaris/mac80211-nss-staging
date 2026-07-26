@@ -4795,21 +4795,23 @@ static void ieee80211_8023_xmit(struct ieee80211_sub_if_data *sdata,
 
 	ieee80211_aggr_check(sdata, sta, skb);
 
-	tid = skb->priority & IEEE80211_QOS_CTL_TAG1D_MASK;
+	if (!ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) {
+		tid = skb->priority & IEEE80211_QOS_CTL_TAG1D_MASK;
 
-	if (sta)
-		tid_tx = rcu_dereference(sta->ampdu_mlme.tid_tx[tid]);
-	if (tid_tx) {
-		if (!test_bit(HT_AGG_STATE_OPERATIONAL, &tid_tx->state)) {
-			/* fall back to non-offload slow path */
-			__ieee80211_subif_start_xmit(skb, dev, 0,
-						     IEEE80211_TX_CTRL_MLO_LINK_UNSPEC,
-						     NULL);
-			return;
+		if (sta)
+			tid_tx = rcu_dereference(sta->ampdu_mlme.tid_tx[tid]);
+		if (tid_tx) {
+			if (!test_bit(HT_AGG_STATE_OPERATIONAL, &tid_tx->state)) {
+				/* fall back to non-offload slow path */
+				__ieee80211_subif_start_xmit(skb, dev, 0,
+							     IEEE80211_TX_CTRL_MLO_LINK_UNSPEC,
+							     NULL);
+				return;
+			}
+
+			if (tid_tx->timeout)
+				tid_tx->last_tx = jiffies;
 		}
-
-		if (tid_tx->timeout)
-			tid_tx->last_tx = jiffies;
 	}
 
 	skb = ieee80211_tx_skb_fixup(skb, ieee80211_sdata_netdev_features(sdata));
@@ -4890,7 +4892,7 @@ static void __ieee80211_subif_start_xmit_8023(struct sk_buff *skb,
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ethhdr *ehdr = (struct ethhdr *)skb->data;
 	struct ieee80211_link_data *link;
-	struct ieee80211_key *key;
+	struct ieee80211_key *key = NULL;
 	struct sta_info *sta;
 
 	rcu_read_lock();
@@ -4898,6 +4900,12 @@ static void __ieee80211_subif_start_xmit_8023(struct sk_buff *skb,
 	if (ieee80211_lookup_ra_sta(sdata, skb, &sta)) {
 		kfree_skb(skb);
 		goto out;
+	}
+
+	if (ieee80211_hw_check(&sdata->local->hw, SUPPORTS_NSS_OFFLOAD)) {
+		if (unlikely(IS_ERR_OR_NULL(sta) || !sta->uploaded))
+			sta = NULL;
+		goto tx_offload;
 	}
 
 	/*
@@ -4930,6 +4938,7 @@ static void __ieee80211_subif_start_xmit_8023(struct sk_buff *skb,
 		goto skip_offload;
 
 	sk_pacing_shift_update(skb->sk, sdata->local->hw.tx_sk_pacing_shift);
+tx_offload:
 	ieee80211_8023_xmit(sdata, dev, sta, key, skb);
 	goto out;
 
