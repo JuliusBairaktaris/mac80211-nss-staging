@@ -2535,6 +2535,8 @@ void ath11k_core_pre_reconfigure_recovery(struct ath11k_base *ab)
 
 	wake_up(&ab->wmi_ab.tx_credits_wq);
 
+	ath11k_nss_pre_reconfigure(ab);
+
 	reinit_completion(&ab->driver_recovery);
 }
 
