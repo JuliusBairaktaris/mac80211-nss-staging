@@ -720,7 +720,7 @@ u8 ath11k_mac_get_target_pdev_id(struct ath11k *ar)
 		return ar->ab->target_pdev_ids[0].pdev_id;
 }
 
-struct ath11k_vif *ath11k_mac_get_ap_arvif_by_addr(struct ath11k_base *ab,
+static struct ath11k_vif *ath11k_mac_get_ap_arvif_by_addr(struct ath11k_base *ab,
 						   const u8 *addr)
 {
 	int i;
