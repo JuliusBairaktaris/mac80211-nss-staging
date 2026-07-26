@@ -36,6 +36,7 @@
 #include "rx_desc.h"
 #include "coredump.h"
 #include "nss.h"
+#include "peer.h"
 #include "fw.h"
 
 #define SM(_v, _f) (((_v) << _f##_LSB) & _f##_MASK)
@@ -1167,6 +1168,9 @@ struct ath11k_base {
 
 	u32 max_ast_index;
 	u32 num_ast_entries;
+	struct mutex base_ast_lock;
+	struct work_struct wmi_ast_work;
+	struct list_head wmi_ast_list;
 
 	bool stats_disable;
 	/* must be last */
