@@ -1113,12 +1113,13 @@ int ath11k_peer_rx_tid_setup(struct ath11k *ar, const u8 *peer_mac, int vdev_id,
 	return ret;
 }
 
-int ath11k_dp_rx_ampdu_start(struct ath11k *ar,
+int ath11k_dp_rx_ampdu_start(struct ath11k_vif *arvif,
 			     struct ieee80211_ampdu_params *params)
 {
+	struct ath11k *ar = arvif->ar;
 	struct ath11k_base *ab = ar->ab;
 	struct ath11k_sta *arsta = ath11k_sta_to_arsta(params->sta);
-	int vdev_id = arsta->arvif->vdev_id;
+	int vdev_id = arvif->vdev_id;
 	int ret;
 
 	ret = ath11k_peer_rx_tid_setup(ar, params->sta->addr, vdev_id,
@@ -1130,14 +1131,14 @@ int ath11k_dp_rx_ampdu_start(struct ath11k *ar,
 	return ret;
 }
 
-int ath11k_dp_rx_ampdu_stop(struct ath11k *ar,
+int ath11k_dp_rx_ampdu_stop(struct ath11k_vif *arvif,
 			    struct ieee80211_ampdu_params *params)
 {
+	struct ath11k *ar = arvif->ar;
 	struct ath11k_base *ab = ar->ab;
 	struct ath11k_peer *peer;
-	struct ath11k_sta *arsta = ath11k_sta_to_arsta(params->sta);
 	struct dp_rx_tid *rx_tid;
-	int vdev_id = arsta->arvif->vdev_id;
+	int vdev_id = arvif->vdev_id;
 	int ret;
 
 	spin_lock_bh(&ab->base_lock);
