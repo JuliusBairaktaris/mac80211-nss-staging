@@ -545,7 +545,7 @@ static int ath11k_dp_rxdma_pdev_buf_setup(struct ath11k *ar)
 	int i;
 
 	/* RXDMA BUF ring is offloaded to NSS */
-	if (!ar->ab->nss.enabled)
+	if (!ab->nss.enabled)
 		ath11k_dp_rxdma_ring_buf_setup(ar, rx_ring, HAL_RXDMA_BUF);
 
 	if (ar->ab->hw_params.rxdma1_enable) {
@@ -1101,17 +1101,17 @@ static int ath11k_peer_rx_tid_reo_update(struct ath11k *ar,
 	return 0;
 }
 
-static void ath11k_dp_rx_tid_mem_free(struct ath11k_base *ab,
+static void ath11k_dp_rx_tid_mem_free(struct ath11k *ar,
 				      const u8 *peer_mac, int vdev_id, u8 tid)
 {
 	struct ath11k_peer *peer;
 	struct dp_rx_tid *rx_tid;
 
-	spin_lock_bh(&ab->base_lock);
+	spin_lock_bh(&ar->ab->base_lock);
 
-	peer = ath11k_peer_find(ab, vdev_id, peer_mac);
+	peer = ath11k_peer_find(ar, vdev_id, peer_mac);
 	if (!peer) {
-		ath11k_warn(ab, "failed to find the peer to free up rx tid mem\n");
+		ath11k_warn(ar->ab, "failed to find the peer to free up rx tid mem\n");
 		goto unlock_exit;
 	}
 
@@ -1119,14 +1119,14 @@ static void ath11k_dp_rx_tid_mem_free(struct ath11k_base *ab,
 	if (!rx_tid->active)
 		goto unlock_exit;
 
-	dma_free_noncoherent(ab->dev, rx_tid->unaligned_size, rx_tid->vaddr_unaligned,
+	dma_free_noncoherent(ar->ab->dev, rx_tid->unaligned_size, rx_tid->vaddr_unaligned,
 			     rx_tid->paddr_unaligned, DMA_BIDIRECTIONAL);
 	rx_tid->vaddr_unaligned = NULL;
 
 	rx_tid->active = false;
 
 unlock_exit:
-	spin_unlock_bh(&ab->base_lock);
+	spin_unlock_bh(&ar->ab->base_lock);
 }
 
 /* Sends WMI config to filter packets to route packets to WBM release ring */
@@ -1166,7 +1166,7 @@ int ath11k_peer_rx_tid_setup(struct ath11k *ar, const u8 *peer_mac, int vdev_id,
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find(ab, vdev_id, peer_mac);
+	peer = ath11k_peer_find(ar, vdev_id, peer_mac);
 	if (!peer) {
 		ath11k_warn(ab, "failed to find the peer %pM to set up rx tid\n",
 			    peer_mac);
@@ -1239,7 +1239,7 @@ int ath11k_peer_rx_tid_setup(struct ath11k *ar, const u8 *peer_mac, int vdev_id,
 	if (ret) {
 		ath11k_warn(ar->ab, "failed to setup rx reorder queue for peer %pM tid %d: %d\n",
 			    peer_mac, tid, ret);
-		ath11k_dp_rx_tid_mem_free(ab, peer_mac, vdev_id, tid);
+		ath11k_dp_rx_tid_mem_free(ar, peer_mac, vdev_id, tid);
 	}
 
 	return ret;
@@ -1275,7 +1275,7 @@ int ath11k_dp_rx_ampdu_stop(struct ath11k_vif *arvif,
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find(ab, vdev_id, params->sta->addr);
+	peer = ath11k_peer_find(ar, vdev_id, params->sta->addr);
 	if (!peer) {
 		ath11k_warn(ab, "failed to find the peer to stop rx aggregation\n");
 		spin_unlock_bh(&ab->base_lock);
@@ -1352,7 +1352,7 @@ int ath11k_dp_peer_rx_pn_replay_config(struct ath11k_vif *arvif,
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find(ab, arvif->vdev_id, peer_addr);
+	peer = ath11k_peer_find(ar, arvif->vdev_id, peer_addr);
 	if (!peer) {
 		ath11k_warn(ab, "failed to find the peer to configure pn replay detection\n");
 		spin_unlock_bh(&ab->base_lock);
@@ -1397,7 +1397,7 @@ static inline int ath11k_get_ppdu_user_index(struct htt_ppdu_stats *ppdu_stats,
 	return -EINVAL;
 }
 
-static int ath11k_htt_tlv_ppdu_stats_parse(struct ath11k_base *ab,
+static int ath11k_htt_tlv_ppdu_stats_parse(struct ath11k_base *ab, struct ath11k *ar,
 					   u16 tag, u16 len, const void *ptr,
 					   void *data)
 {
@@ -1622,7 +1622,7 @@ ath11k_update_per_peer_tx_stats(struct ath11k *ar,
 
 	rcu_read_lock();
 	spin_lock_bh(&ab->base_lock);
-	peer = ath11k_peer_find_by_id(ab, usr_stats->peer_id);
+	peer = ath11k_peer_find_by_id(ar, usr_stats->peer_id);
 
 	if (!peer || !peer->sta) {
 		spin_unlock_bh(&ab->base_lock);
@@ -1771,8 +1771,8 @@ void ath11k_copy_to_bar(struct ath11k_peer *peer,
 	peer->delayba_flag = false;
 }
 
-int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, const void *ptr, size_t len,
-			   int (*iter)(struct ath11k_base *ar, u16 tag, u16 len,
+int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, struct ath11k *ar, const void *ptr, size_t len,
+			   int (*iter)(struct ath11k_base *ab, struct ath11k *ar, u16 tag, u16 len,
 				       const void *ptr, void *data),
 			   void *data)
 {
@@ -1804,7 +1804,7 @@ int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, const void *ptr, size_t len,
 			return -EINVAL;
 		}
 
-		ret = iter(ab, tlv_tag, tlv_len, ptr, ppdu_info);
+		ret = iter(ab, ar, tlv_tag, tlv_len, ptr, ppdu_info);
 		if (ret == -ENOMEM)
 			return ret;
 
@@ -1850,7 +1850,7 @@ static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 	}
 
 	ppdu_info->ppdu_id = ppdu_id;
-	ret = ath11k_dp_htt_tlv_iter(ab, msg->data, len,
+	ret = ath11k_dp_htt_tlv_iter(ab, ar, msg->data, len,
 				     ath11k_htt_tlv_ppdu_stats_parse,
 				     (void *)ppdu_info);
 	if (ret) {
@@ -1866,7 +1866,7 @@ static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 		for (i = 0; i < ppdu_info->ppdu_stats.common.num_users; i++) {
 			peer_id = ppdu_info->ppdu_stats.user_stats[i].peer_id;
 			spin_lock_bh(&ab->base_lock);
-			peer = ath11k_peer_find_by_id(ab, peer_id);
+			peer = ath11k_peer_find_by_id(ar, peer_id);
 			if (!peer) {
 				spin_unlock_bh(&ab->base_lock);
 				continue;
@@ -1886,7 +1886,7 @@ static int ath11k_htt_pull_ppdu_stats(struct ath11k_base *ab,
 		for (i = 0; i < ppdu_info->bar_num_users; i++) {
 			peer_id = ppdu_info->ppdu_stats.user_stats[i].peer_id;
 			spin_lock_bh(&ab->base_lock);
-			peer = ath11k_peer_find_by_id(ab, peer_id);
+			peer = ath11k_peer_find_by_id(ar, peer_id);
 			if (!peer) {
 				spin_unlock_bh(&ab->base_lock);
 				continue;
@@ -1985,6 +1985,7 @@ void ath11k_dp_htt_htc_t2h_msg_handler(struct ath11k_base *ab,
 				       struct sk_buff *skb)
 {
 	struct ath11k_dp *dp = &ab->dp;
+	struct ath11k *ar;
 	struct htt_resp_msg *resp = (struct htt_resp_msg *)skb->data;
 	enum htt_t2h_msg_type type = FIELD_GET(HTT_T2H_MSG_TYPE, *(u32 *)resp);
 	u16 peer_id;
@@ -2015,7 +2016,16 @@ void ath11k_dp_htt_htc_t2h_msg_handler(struct ath11k_base *ab,
 					 resp->peer_map_ev.info1);
 		ath11k_dp_get_mac_addr(resp->peer_map_ev.mac_addr_l32,
 				       peer_mac_h16, mac_addr);
-		ath11k_peer_map_event(ab, vdev_id, peer_id, mac_addr, 0, 0);
+		rcu_read_lock();
+		ar = ath11k_mac_get_ar_by_vdev_id(ab, vdev_id);
+		if (!ar) {
+			ath11k_warn(ab, "htt peer event %d for unknown vdev id %d\n",
+				    type, vdev_id);
+			rcu_read_unlock();
+			break;
+		}
+		ath11k_peer_map_event(ar, vdev_id, peer_id, mac_addr, 0, 0);
+		rcu_read_unlock();
 		break;
 	case HTT_T2H_MSG_TYPE_PEER_MAP2:
 		vdev_id = FIELD_GET(HTT_T2H_PEER_MAP_INFO_VDEV_ID,
@@ -2032,16 +2042,38 @@ void ath11k_dp_htt_htc_t2h_msg_handler(struct ath11k_base *ab,
 				       resp->peer_map_ev.info1);
 		is_wds = FIELD_GET(HTT_T2H_PEER_MAP_INFO2_NEXT_HOP_M,
 				   resp->peer_map_ev.info2);
-		ath11k_peer_map_v2_event(ab, vdev_id, peer_id, mac_addr, ast_hash,
+		rcu_read_lock();
+		ar = ath11k_mac_get_ar_by_vdev_id(ab, vdev_id);
+		if (!ar) {
+			ath11k_warn(ab, "htt peer event %d for unknown vdev id %d\n",
+				    type, vdev_id);
+			rcu_read_unlock();
+			break;
+		}
+		ath11k_peer_map_v2_event(ar, vdev_id, peer_id, mac_addr, ast_hash,
 				         hw_peer_id, is_wds);
+		rcu_read_unlock();
 		break;
 	case HTT_T2H_MSG_TYPE_PEER_UNMAP:
 		peer_id = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO_PEER_ID,
 				    resp->peer_unmap_ev.info);
-		ath11k_peer_unmap_event(ab, peer_id);
+		vdev_id = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO_VDEV_ID,
+				    resp->peer_unmap_ev.info);
+		rcu_read_lock();
+		ar = ath11k_mac_get_ar_by_vdev_id(ab, vdev_id);
+		if (!ar) {
+			ath11k_warn(ab, "htt peer event %d for unknown vdev id %d\n",
+				    type, vdev_id);
+			rcu_read_unlock();
+			break;
+		}
+		ath11k_peer_unmap_event(ar, peer_id);
+		rcu_read_unlock();
 		break;
 	case HTT_T2H_MSG_TYPE_PEER_UNMAP2:
 		peer_id = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO_PEER_ID,
+				    resp->peer_unmap_ev.info);
+		vdev_id = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO_VDEV_ID,
 				    resp->peer_unmap_ev.info);
 		peer_mac_h16 = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO1_MAC_ADDR_H16,
 					 resp->peer_unmap_ev.info1);
@@ -2051,7 +2083,16 @@ void ath11k_dp_htt_htc_t2h_msg_handler(struct ath11k_base *ab,
 				   resp->peer_unmap_ev.info1);
 		free_wds_count = FIELD_GET(HTT_T2H_PEER_UNMAP_INFO3_WDS_FREE_COUNT,
 					   resp->peer_unmap_ev.info3);
-		ath11k_peer_unmap_v2_event(ab, peer_id, mac_addr, is_wds, free_wds_count);
+		rcu_read_lock();
+		ar = ath11k_mac_get_ar_by_vdev_id(ab, vdev_id);
+		if (!ar) {
+			ath11k_warn(ab, "htt peer event %d for unknown vdev id %d\n",
+				    type, vdev_id);
+			rcu_read_unlock();
+			break;
+		}
+		ath11k_peer_unmap_v2_event(ar, peer_id, mac_addr, is_wds, free_wds_count);
+		rcu_read_unlock();
 		break;
 	case HTT_T2H_MSG_TYPE_PPDU_STATS_IND:
 		ath11k_htt_pull_ppdu_stats(ab, skb);
@@ -2704,24 +2745,24 @@ static void ath11k_dp_rx_h_undecap(struct ath11k *ar, struct sk_buff *msdu,
 }
 
 static struct ath11k_peer *
-ath11k_dp_rx_h_find_peer(struct ath11k_base *ab, struct sk_buff *msdu)
+ath11k_dp_rx_h_find_peer(struct ath11k *ar, struct sk_buff *msdu)
 {
 	struct ath11k_skb_rxcb *rxcb = ATH11K_SKB_RXCB(msdu);
 	struct hal_rx_desc *rx_desc = rxcb->rx_desc;
 	struct ath11k_peer *peer = NULL;
 
-	lockdep_assert_held(&ab->base_lock);
+	lockdep_assert_held(&ar->ab->base_lock);
 
-	peer = ath11k_peer_find_by_id(ab, rxcb->peer_id);
+	peer = ath11k_peer_find_by_id(ar, rxcb->peer_id);
 
 	if (peer)
 		return peer;
 
-	if (!rx_desc || !(ath11k_dp_rxdesc_mac_addr2_valid(ab, rx_desc)))
+	if (!rx_desc || !(ath11k_dp_rxdesc_mac_addr2_valid(ar->ab, rx_desc)))
 		return NULL;
 
-	peer = ath11k_peer_find_by_addr(ab,
-					ath11k_dp_rxdesc_mpdu_start_addr2(ab, rx_desc));
+	peer = ath11k_peer_find_by_addr(ar,
+					ath11k_dp_rxdesc_mpdu_start_addr2(ar->ab, rx_desc));
 	return peer;
 }
 
@@ -2765,7 +2806,7 @@ static bool ath11k_dp_rx_check_fast_rx(struct ath11k *ar,
 		return false;
 
 	/* check if the msdu needs to be bridged to our connected peer */
-	f_peer = ath11k_peer_find_by_addr(ar->ab, ehdr->h_dest);
+	f_peer = ath11k_peer_find_by_addr(ar, ehdr->h_dest);
 
 	if (f_peer && f_peer != peer)
 		return false;
@@ -2804,7 +2845,7 @@ static void ath11k_dp_rx_h_mpdu(struct ath11k *ar,
 	}
 
 	spin_lock_bh(&ar->ab->base_lock);
-	peer = ath11k_dp_rx_h_find_peer(ar->ab, msdu);
+	peer = ath11k_dp_rx_h_find_peer(ar, msdu);
 	if (peer) {
 		/* If the pkt is a valid IP packet and peer supports
 		 * fast rx, deliver directly to net, also note that
@@ -3032,7 +3073,7 @@ static void ath11k_dp_rx_deliver_msdu(struct ath11k *ar, struct napi_struct *nap
 		decap = ath11k_dp_rx_h_msdu_start_decap_type(ar->ab, rxcb->rx_desc);
 
 	spin_lock_bh(&ar->ab->base_lock);
-	peer = ath11k_dp_rx_h_find_peer(ar->ab, msdu);
+	peer = ath11k_dp_rx_h_find_peer(ar, msdu);
 	if (peer && peer->sta)
 		pubsta = peer->sta;
 	spin_unlock_bh(&ar->ab->base_lock);
@@ -3893,7 +3934,7 @@ int ath11k_peer_rx_frag_setup(struct ath11k *ar, const u8 *peer_mac, int vdev_id
 
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find(ab, vdev_id, peer_mac);
+	peer = ath11k_peer_find(ar, vdev_id, peer_mac);
 	if (!peer) {
 		ath11k_warn(ab, "failed to find the peer to set up fragment info\n");
 		spin_unlock_bh(&ab->base_lock);
@@ -4349,7 +4390,7 @@ static int ath11k_dp_rx_frag_h_mpdu(struct ath11k *ar,
 		return -EINVAL;
 
 	spin_lock_bh(&ab->base_lock);
-	peer = ath11k_peer_find_by_id(ab, peer_id);
+	peer = ath11k_peer_find_by_id(ar, peer_id);
 	if (!peer) {
 		ath11k_warn(ab, "failed to find the peer to de-fragment received fragment peer_id %d\n",
 			    peer_id);
@@ -4411,7 +4452,7 @@ static int ath11k_dp_rx_frag_h_mpdu(struct ath11k *ar,
 	timer_delete_sync(&rx_tid->frag_timer);
 	spin_lock_bh(&ab->base_lock);
 
-	peer = ath11k_peer_find_by_id(ab, peer_id);
+	peer = ath11k_peer_find_by_id(ar, peer_id);
 	if (!peer)
 		goto err_frags_cleanup;
 
@@ -6048,7 +6089,7 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 			trace_ath11k_htt_rxdesc(ar, skb->data, log_type, rx_buf_sz);
 
 		ppdu_info->peer_id = HAL_INVALID_PEERID;
-		hal_status = ath11k_hal_rx_parse_mon_status(ab, ppdu_info, skb);
+		hal_status = ath11k_hal_rx_parse_mon_status(ar, ppdu_info, skb);
 
 		if (test_bit(ATH11K_FLAG_MONITOR_STARTED, &ar->monitor_flags) &&
 		    pmon->mon_ppdu_status == DP_PPDU_STATUS_START &&
@@ -6071,7 +6112,7 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 
 		rcu_read_lock();
 		spin_lock_bh(&ab->base_lock);
-		peer = ath11k_peer_find_by_id(ab, ppdu_info->peer_id);
+		peer = ath11k_peer_find_by_id(ar, ppdu_info->peer_id);
 
 		if (!peer || !peer->sta) {
 			ath11k_dbg(ab, ATH11K_DBG_DATA,

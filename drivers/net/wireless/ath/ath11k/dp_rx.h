@@ -127,8 +127,8 @@ int ath11k_dp_rxbufs_replenish(struct ath11k_base *ab, int mac_id,
 			       struct dp_rxdma_ring *rx_ring,
 			       int req_entries,
 			       enum hal_rx_buf_return_buf_manager mgr);
-int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, const void *ptr, size_t len,
-			   int (*iter)(struct ath11k_base *ar, u16 tag, u16 len,
+int ath11k_dp_htt_tlv_iter(struct ath11k_base *ab, struct ath11k *ar, const void *ptr, size_t len,
+			   int (*iter)(struct ath11k_base *ab, struct ath11k *ar, u16 tag, u16 len,
 				       const void *ptr, void *data),
 			   void *data);
 int ath11k_dp_rx_process_mon_rings(struct ath11k_base *ab, int mac_id,
