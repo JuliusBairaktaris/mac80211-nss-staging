@@ -437,7 +437,7 @@ static int ath11k_dp_srng_common_setup(struct ath11k_base *ab)
 		}
 
 		srng = &ab->hal.srng_list[dp->tx_ring[i].tcl_data_ring.ring_id];
-		ath11k_hal_tx_init_data_ring(ab, srng);
+		ath11k_hal_tx_init_data_ring(ab, srng, HAL_TCL_DATA);
 
 		ath11k_dp_shadow_init_timer(ab, &dp->tx_ring_timer[i],
 					    ATH11K_SHADOW_DP_TIMER_INTERVAL,
