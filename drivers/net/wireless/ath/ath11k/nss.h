@@ -139,6 +139,21 @@ struct peer_stats {
 	u32 rx_dropped;
 	u32 last_rxdrop;
 	struct rate_info rxrate;
+	/* wifili firmware per-peer counters from the peer stats sync */
+	u32 tx_amsdu;
+	u32 tx_non_amsdu;
+	u32 tx_ofdma;
+	u32 tx_failed_retries;
+	u32 tx_multiple_retries;
+	u32 tx_mpdu_retries;
+	u32 tx_mpdu_total_retries;
+	u32 rx_amsdu;
+	u32 rx_non_amsdu;
+	u32 rx_retries;
+	u32 rx_intra_bss;
+	u32 rx_intra_bss_fail;
+	u32 rx_mic_err;
+	u32 rx_decrypt_err;
 };
 
 enum ath11k_nss_peer_sec_type {
