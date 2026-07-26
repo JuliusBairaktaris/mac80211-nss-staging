@@ -30,6 +30,10 @@ ath11k-$(CONFIG_PM) += wow.o
 ath11k-$(CONFIG_DEV_COREDUMP) += coredump.o
 ath11k-$(CPTCFG_ATH11K_NSS_SUPPORT) += nss.o
 
+ifeq ($(and $(CPTCFG_ATH11K_DEBUGFS),$(CPTCFG_ATH11K_NSS_MESH_SUPPORT)),y)
+ath11k-y += debug_nss.o
+endif
+
 obj-$(CPTCFG_ATH11K_AHB) += ath11k_ahb.o
 ath11k_ahb-y += ahb.o
 
