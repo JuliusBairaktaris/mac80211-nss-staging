@@ -1766,6 +1766,7 @@ int ath11k_dp_service_srng(struct ath11k_base *ab,
 			   int budget);
 int ath11k_dp_htt_connect(struct ath11k_dp *dp);
 void ath11k_dp_vdev_tx_attach(struct ath11k *ar, struct ath11k_vif *arvif);
+void ath11k_dp_tx_complete_pending(struct ath11k *ar);
 void ath11k_dp_free(struct ath11k_base *ab);
 int ath11k_dp_alloc(struct ath11k_base *ab);
 int ath11k_dp_pdev_alloc(struct ath11k_base *ab);
