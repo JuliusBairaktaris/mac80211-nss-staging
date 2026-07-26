@@ -224,6 +224,7 @@ enum ieee80211_rx_flags {
 };
 
 struct ieee80211_rx_data {
+	struct napi_struct *napi;
 	struct list_head *list;
 	struct sk_buff *skb;
 	struct ieee80211_local *local;
