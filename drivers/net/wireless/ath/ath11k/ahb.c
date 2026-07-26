@@ -387,6 +387,7 @@ static void ath11k_ahb_ext_irq_enable(struct ath11k_base *ab)
 		struct ath11k_ext_irq_grp *irq_grp = &ab->ext_irq_grp[i];
 
 		if (!irq_grp->napi_enabled) {
+			dev_set_threaded(irq_grp->napi_ndev, NETDEV_NAPI_THREADED_ENABLED);
 			napi_enable(&irq_grp->napi);
 			irq_grp->napi_enabled = true;
 		}
@@ -538,6 +539,7 @@ static int ath11k_ahb_config_ext_irq(struct ath11k_base *ab)
 	int irq;
 	int ret;
 	bool nss_offload;
+	static int devidx = 0;
 
 	/* TCL Completion, REO Dest, ERR, Exception and h2rxdma rings are offloaded
 	 * to nss when its enabled, hence don't enable these interrupts
@@ -554,6 +556,9 @@ static int ath11k_ahb_config_ext_irq(struct ath11k_base *ab)
 		irq_grp->napi_ndev = alloc_netdev_dummy(0);
 		if (!irq_grp->napi_ndev)
 			return -ENOMEM;
+
+		snprintf(irq_grp->napi_ndev->name, sizeof(irq_grp->napi_ndev->name), "%s%d:%d",
+			 "ath11k_ahb", devidx, i);
 
 		netif_napi_add(irq_grp->napi_ndev, &irq_grp->napi,
 			       ath11k_ahb_ext_grp_napi_poll);
@@ -619,6 +624,8 @@ static int ath11k_ahb_config_ext_irq(struct ath11k_base *ab)
 			}
 		}
 	}
+
+	devidx++;
 
 	return 0;
 }
