@@ -2777,7 +2777,11 @@ static int ieee80211_set_sta_4addr(struct ieee80211_local *local,
 
 	rcu_assign_pointer(sdata->u.vlan.sta, sta);
 	__ieee80211_check_fast_rx_iface(sdata);
-	drv_sta_set_4addr(local, sta->sdata, &sta->sta, true);
+
+	if (ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD))
+		drv_sta_set_4addr(local, sdata, &sta->sta, true);
+	else
+		drv_sta_set_4addr(local, sta->sdata, &sta->sta, true);
 
 	return 0;
 }

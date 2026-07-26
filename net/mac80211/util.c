@@ -1734,6 +1734,9 @@ static void ieee80211_assign_chanctx(struct ieee80211_local *local,
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
+	if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+		return;
+
 	conf = rcu_dereference_protected(link->conf->chanctx_conf,
 					 lockdep_is_held(&local->hw.wiphy->mtx));
 	if (conf) {
@@ -2022,7 +2025,8 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		/* These vifs can't be added before NAN was started */
 		if (sdata->vif.type == NL80211_IFTYPE_NAN_DATA)
 			continue;
-		if (sdata->vif.type != NL80211_IFTYPE_AP_VLAN &&
+		if ((sdata->vif.type != NL80211_IFTYPE_AP_VLAN ||
+		    ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) &&
 		    ieee80211_sdata_running(sdata)) {
 			res = drv_add_interface(local, sdata);
 			if (WARN_ON(res))
@@ -2041,7 +2045,8 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 				continue;
 			if (sdata->vif.type == NL80211_IFTYPE_NAN_DATA)
 				continue;
-			if (sdata->vif.type != NL80211_IFTYPE_AP_VLAN &&
+			if ((sdata->vif.type != NL80211_IFTYPE_AP_VLAN ||
+			    ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) &&
 			    ieee80211_sdata_running(sdata))
 				drv_remove_interface(local, sdata);
 		}
