@@ -498,6 +498,7 @@ void ath11k_pcic_ext_irq_enable(struct ath11k_base *ab)
 		struct ath11k_ext_irq_grp *irq_grp = &ab->ext_irq_grp[i];
 
 		if (!irq_grp->napi_enabled) {
+			dev_set_threaded(irq_grp->napi_ndev, NETDEV_NAPI_THREADED_ENABLED);
 			napi_enable(&irq_grp->napi);
 			irq_grp->napi_enabled = true;
 		}
@@ -585,6 +586,7 @@ static int ath11k_pcic_ext_irq_config(struct ath11k_base *ab)
 	u32 user_base_data = 0, base_vector = 0;
 	struct ath11k_ext_irq_grp *irq_grp;
 	unsigned long irq_flags;
+	static int devidx = 0;
 
 	ret = ath11k_pcic_get_user_msi_assignment(ab, "DP", &num_vectors,
 						  &user_base_data,
@@ -607,6 +609,9 @@ static int ath11k_pcic_ext_irq_config(struct ath11k_base *ab)
 			ret = -ENOMEM;
 			goto fail_allocate;
 		}
+
+		snprintf(irq_grp->napi_ndev->name, sizeof(irq_grp->napi_ndev->name), "%s%d:%d",
+			 "ath11k_pci", devidx, i);
 
 		netif_napi_add(irq_grp->napi_ndev, &irq_grp->napi,
 			       ath11k_pcic_ext_grp_napi_poll);
@@ -661,6 +666,8 @@ static int ath11k_pcic_ext_irq_config(struct ath11k_base *ab)
 		}
 		ath11k_pcic_ext_grp_disable(irq_grp);
 	}
+
+	devidx++;
 
 	return 0;
 fail_irq:
