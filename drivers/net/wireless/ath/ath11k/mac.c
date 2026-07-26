@@ -5066,12 +5066,6 @@ static int ath11k_station_disassoc(struct ath11k *ar,
 			return ret;
 	}
 
-	ret = ath11k_clear_peer_keys(arvif, sta->addr);
-	if (ret) {
-		ath11k_warn(ar->ab, "failed to clear all peer keys for vdev %i: %d\n",
-			    arvif->vdev_id, ret);
-		return ret;
-	}
 	return 0;
 }
 
@@ -10401,6 +10395,17 @@ static int ath11k_mac_op_sta_state(struct ieee80211_hw *hw,
 		arsta->bw = ath11k_mac_ieee80211_sta_bw_to_wmi(ar, sta);
 		arsta->bw_prev = arsta->bw;
 		spin_unlock_bh(&ar->data_lock);
+
+		/* Driver should clear the peer keys during mac80211's ref ptr
+		 * gets cleared in __sta_info_destroy_part2 (trans from
+		 * IEEE80211_STA_AUTHORIZED to IEEE80211_STA_ASSOC)
+		 */
+		ret = ath11k_clear_peer_keys(arvif, sta->addr);
+		if (ret) {
+			ath11k_warn(ar->ab, "failed to clear all peer keys for vdev %i: %d\n",
+					arvif->vdev_id, ret);
+			return ret;
+		}
 	} else if (old_state == IEEE80211_STA_ASSOC &&
 		   new_state == IEEE80211_STA_AUTHORIZED) {
 		spin_lock_bh(&ar->ab->base_lock);
