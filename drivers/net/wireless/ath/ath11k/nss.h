@@ -285,6 +285,7 @@ void ath11k_nss_update_sta_rxrate(struct hal_rx_mon_ppdu_info *ppdu_info,
 				  struct hal_rx_user_status *user_stats);
 int ath11k_nss_setup(struct ath11k_base *ab);
 int ath11k_nss_teardown(struct ath11k_base *ab);
+int ath11k_nss_pre_reconfigure(struct ath11k_base *ab);
 void ath11k_nss_ext_rx_stats(struct ath11k_base *ab, struct htt_rx_ring_tlv_filter *tlv_filter);
 #else
 static inline int ath11k_nss_tx(struct ath11k_vif *arvif, struct sk_buff *skb)
@@ -448,6 +449,11 @@ static inline void ath11k_nss_ext_vdev_delete(struct ath11k_vif *arvif)
 }
 
 static inline int ath11k_nss_teardown(struct ath11k_base *ab)
+{
+	return 0;
+}
+
+static inline int ath11k_nss_pre_reconfigure(struct ath11k_base *ab)
 {
 	return 0;
 }
