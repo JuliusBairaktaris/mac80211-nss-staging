@@ -9,7 +9,6 @@
 #include "hal_tx.h"
 #include "hal_rx.h"
 #include "hal_desc.h"
-#include "hif.h"
 
 static void ath11k_hal_reo_set_desc_hdr(struct hal_desc_header *hdr,
 					u8 owner, u8 buffer_type, u32 magic)
@@ -872,7 +871,7 @@ static u16 ath11k_hal_rx_mpduinfo_get_peerid(struct ath11k_base *ab,
 }
 
 static enum hal_rx_mon_status
-ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
+ath11k_hal_rx_parse_mon_status_tlv(struct ath11k *ar,
 				   struct hal_rx_mon_ppdu_info *ppdu_info,
 				   u32 tlv_tag, u8 *tlv_data, u32 userid)
 {
@@ -1486,7 +1485,7 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 	case HAL_PHYRX_RSSI_LEGACY: {
 		int i;
 		bool db2dbm = test_bit(WMI_TLV_SERVICE_HW_DB2DBM_CONVERSION_SUPPORT,
-				       ab->wmi_ab.svc_map);
+				       ar->ab->wmi_ab.svc_map);
 		struct hal_rx_phyrx_rssi_legacy_info *rssi =
 			(struct hal_rx_phyrx_rssi_legacy_info *)tlv_data;
 		u32 reception_type = 0;
@@ -1528,9 +1527,9 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		struct hal_rx_mpdu_info *mpdu_info =
 				(struct hal_rx_mpdu_info *)tlv_data;
 
-		ppdu_info->peer_id = ath11k_hal_rx_mpduinfo_get_peerid(ab, mpdu_info);
+		ppdu_info->peer_id = ath11k_hal_rx_mpduinfo_get_peerid(ar->ab, mpdu_info);
 
-		ppdu_info->mpdu_len += ab->hw_params.hw_ops->rx_desc_get_hal_mpdu_len(mpdu_info);
+		ppdu_info->mpdu_len += ar->ab->hw_params.hw_ops->rx_desc_get_hal_mpdu_len(mpdu_info);
 
 		break;
 	}
@@ -1558,7 +1557,7 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 }
 
 enum hal_rx_mon_status
-ath11k_hal_rx_parse_mon_status(struct ath11k_base *ab,
+ath11k_hal_rx_parse_mon_status(struct ath11k *ar,
 			       struct hal_rx_mon_ppdu_info *ppdu_info,
 			       struct sk_buff *skb)
 {
@@ -1584,7 +1583,7 @@ ath11k_hal_rx_parse_mon_status(struct ath11k_base *ab,
 		if (tlv_tag == HAL_RX_PPDU_END)
 			tlv_len = sizeof(struct hal_rx_rxpcu_classification_overview);
 
-		hal_status = ath11k_hal_rx_parse_mon_status_tlv(ab, ppdu_info,
+		hal_status = ath11k_hal_rx_parse_mon_status_tlv(ar, ppdu_info,
 								tlv_tag, ptr, tlv_userid);
 		ptr += tlv_len;
 		ptr = PTR_ALIGN(ptr, HAL_TLV_ALIGN);

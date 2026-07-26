@@ -751,9 +751,22 @@ struct ath11k {
 			iftype[NUM_NL80211_BANDS][NUM_NL80211_IFTYPES];
 	} mac;
 
+	/* To synchronize rhash tbl write operation */
+	struct mutex tbl_mtx_lock;
+
+	/* The rhashtable containing struct ath11k_peer keyed by mac addr */
+	struct rhashtable *rhead_peer_addr;
+	struct rhashtable_params rhash_peer_addr_param;
+
+	/* The rhashtable containing struct ath11k_peer keyed by id  */
+	struct rhashtable *rhead_peer_id;
+	struct rhashtable_params rhash_peer_id_param;
+
+
 	unsigned long dev_flags;
 	unsigned int filter_flags;
 	unsigned long monitor_flags;
+	u32 ack_timeout;
 	u32 min_tx_power;
 	u32 max_tx_power;
 	u32 txpower_limit_2g;
@@ -833,6 +846,9 @@ struct ath11k {
 
 	struct work_struct wmi_mgmt_tx_work;
 	struct sk_buff_head wmi_mgmt_tx_queue;
+
+	struct list_head peers;
+	wait_queue_head_t peer_mapping_wq;
 
 	struct ath11k_wow wow;
 	struct completion target_suspend;
@@ -1045,19 +1061,7 @@ struct ath11k_base {
 	struct ath11k_hal_reg_capabilities_ext hal_reg_cap[MAX_RADIOS];
 	unsigned long long free_vdev_map;
 
-	/* To synchronize rhash tbl write operation */
-	struct mutex tbl_mtx_lock;
 
-	/* The rhashtable containing struct ath11k_peer keyed by mac addr */
-	struct rhashtable *rhead_peer_addr;
-	struct rhashtable_params rhash_peer_addr_param;
-
-	/* The rhashtable containing struct ath11k_peer keyed by id  */
-	struct rhashtable *rhead_peer_id;
-	struct rhashtable_params rhash_peer_id_param;
-
-	struct list_head peers;
-	wait_queue_head_t peer_mapping_wq;
 	u8 mac_addr[ETH_ALEN];
 	int userpd_id;
 	int irq_num[ATH11K_IRQ_NUM_MAX];
@@ -1455,5 +1459,37 @@ static inline const char *ath11k_bus_str(enum ath11k_bus bus)
 }
 
 void ath11k_core_pm_notifier_unregister(struct ath11k_base *ab);
+
+static inline struct ath11k_peer *ath11k_peer_find_by_addr(struct ath11k *ar,
+					     const u8 *addr)
+{
+	struct ath11k_peer *peer;
+
+	lockdep_assert_held(&ar->ab->base_lock);
+
+	if (!ar->rhead_peer_addr)
+		return NULL;
+
+	peer = rhashtable_lookup_fast(ar->rhead_peer_addr, addr,
+				      ar->rhash_peer_addr_param);
+
+	return peer;
+}
+
+static inline struct ath11k_peer *ath11k_peer_find_by_id(struct ath11k *ar,
+					   int peer_id)
+{
+	struct ath11k_peer *peer;
+
+	lockdep_assert_held(&ar->ab->base_lock);
+
+	if (!ar->rhead_peer_id)
+		return NULL;
+
+	peer = rhashtable_lookup_fast(ar->rhead_peer_id, &peer_id,
+				      ar->rhash_peer_id_param);
+
+	return peer;
+}
 
 #endif /* _CORE_H_ */
