@@ -3105,6 +3105,9 @@ struct ieee80211_txq {
  *	BlockAck frames.
  * @IEEE80211_HW_SUPPORTS_NSS_OFFLOAD: Hardware/driver supports NSS offload
  *
+ * @IEE80211_HW_HAS_TX_QUEUE: Hardware/drivers has tx queue, does skb queuing itself,
+ *	the stack will not do tx queuing.
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -3167,6 +3170,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_STRICT,
 	IEEE80211_HW_SUPPORTS_NDP_BLOCKACK,
 	IEEE80211_HW_SUPPORTS_NSS_OFFLOAD,
+	IEEE80211_HW_HAS_TX_QUEUE,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
