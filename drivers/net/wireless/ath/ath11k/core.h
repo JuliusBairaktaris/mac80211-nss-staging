@@ -909,6 +909,8 @@ struct ath11k_soc_dp_tx_err_stats {
 	 * idr unavailable etc.
 	 */
 	atomic_t misc_fail;
+	/* Tx failures due to NSS Tx error status */
+	atomic_t nss_tx_fail;
 };
 
 struct ath11k_soc_dp_stats {
@@ -959,6 +961,7 @@ struct ath11k_base {
 	struct ath11k_htc htc;
 
 	struct ath11k_dp dp;
+	struct ath11k_soc_nss nss;
 
 	void __iomem *mem;
 	void __iomem *mem_ce;
