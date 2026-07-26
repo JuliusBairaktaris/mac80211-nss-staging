@@ -3574,6 +3574,18 @@ static void ath11k_mac_op_nss_bss_info_changed(struct ieee80211_hw *hw,
 			ath11k_warn(ar->ab, "failed to set ap_isolate in nss %d\n", ret);
 	}
 
+#ifdef CPTCFG_ATH11K_NSS_MESH_SUPPORT
+	if (changed & (BSS_CHANGED_NSS_MESH_TTL |
+				BSS_CHANGED_NSS_MESH_REFRESH_TIME |
+				BSS_CHANGED_NSS_MESH_FWD_ENABLED)) {
+		ret = ath11k_nss_mesh_config_update(vif, changed);
+		if (ret)
+			ath11k_warn(ar->ab,
+					"failed to update mesh nss offload configuration %d\n",
+					ret);
+	}
+#endif
+
 	mutex_unlock(&ar->conf_mutex);
 }
 
@@ -10514,6 +10526,28 @@ static int ath11k_mac_op_sta_state(struct ieee80211_hw *hw,
 	return ret;
 }
 
+#ifdef CPTCFG_ATH11K_NSS_MESH_SUPPORT
+static void
+ath11k_mac_op_config_mesh_offload_path(struct ieee80211_hw *hw,
+				       struct ieee80211_vif *vif,
+				       enum ieee80211_mesh_path_offld_cmd cmd,
+				       struct ieee80211_mesh_path_offld *path)
+{
+	struct ath11k *ar = hw->priv;
+	struct ath11k_vif *arvif = ath11k_vif_to_arvif(vif);
+	int ret;
+
+	if (arvif->ar->ab->nss.debug_mode) {
+		ret = 0;
+		return;
+	}
+
+	ret = ath11k_nss_mesh_config_path(ar, arvif, cmd, path);
+	if (ret)
+		ath11k_warn(ar->ab, "failed to configure path entry to mesh table %d\n", ret);
+}
+#endif
+
 static const struct ieee80211_ops ath11k_ops = {
 	.tx				= ath11k_mac_op_tx,
 	.wake_tx_queue			= ieee80211_handle_wake_tx_queue,
@@ -10573,6 +10607,9 @@ static const struct ieee80211_ops ath11k_ops = {
 	.set_sar_specs			= ath11k_mac_op_set_bios_sar_specs,
 	.remain_on_channel		= ath11k_mac_op_remain_on_channel,
 	.cancel_remain_on_channel	= ath11k_mac_op_cancel_remain_on_channel,
+#ifdef CPTCFG_ATH11K_NSS_MESH_SUPPORT
+	.config_mesh_offload_path       = ath11k_mac_op_config_mesh_offload_path,
+#endif
 };
 
 static void ath11k_mac_update_ch_list(struct ath11k *ar,
@@ -11091,6 +11128,8 @@ static int __ath11k_mac_register(struct ath11k *ar)
 		ieee80211_hw_set(ar->hw, SUPPORTS_NSS_OFFLOAD);
 		wiphy_ext_feature_set(ar->hw->wiphy,
 				      NL80211_EXT_FEATURE_VLAN_OFFLOAD);
+		if (ab->nss.mesh_nss_offload_enabled)
+			ieee80211_hw_set(ar->hw, SUPPORTS_MESH_NSS_OFFLOAD);
 	}
 
 	ret = ieee80211_register_hw(ar->hw);
