@@ -49,12 +49,17 @@ int ath11k_dp_peer_setup(struct ath11k *ar, int vdev_id, const u8 *addr)
 	struct ath11k_peer *peer;
 	u32 reo_dest;
 	int ret = 0, tid;
+	bool rx_hash_enable = DP_RX_HASH_ENABLE;
+
+	/* RX Hash based steering is disabled for NSS Offload */
+	if (ar->ab->nss.enabled)
+		rx_hash_enable = DP_RX_HASH_DISABLE;
 
 	/* NOTE: reo_dest ring id starts from 1 unlike mac_id which starts from 0 */
 	reo_dest = ar->dp.mac_id + 1;
 	ret = ath11k_wmi_set_peer_param(ar, addr, vdev_id,
 					WMI_PEER_SET_DEFAULT_ROUTING,
-					DP_RX_HASH_ENABLE | (reo_dest << 1));
+					rx_hash_enable | (reo_dest << 1));
 
 	if (ret) {
 		ath11k_warn(ab, "failed to set default routing %d peer :%pM vdev_id :%d\n",
@@ -134,6 +139,18 @@ static int ath11k_dp_srng_calculate_msi_group(struct ath11k_base *ab,
 					      enum hal_ring_type type, int ring_num)
 {
 	const u8 *grp_mask;
+
+	if (ab->nss.enabled) {
+		switch (type) {
+		case HAL_REO_STATUS:
+		case HAL_RXDMA_MONITOR_STATUS:
+		case HAL_RXDMA_MONITOR_DST:
+		case HAL_RXDMA_MONITOR_BUF:
+			break;
+		default:
+			return -ENOENT;
+		}
+	}
 
 	switch (type) {
 	case HAL_WBM2SW_RELEASE:
@@ -781,14 +798,19 @@ int ath11k_dp_service_srng(struct ath11k_base *ab,
 	int work_done = 0;
 	int i, j;
 	int tot_work_done = 0;
+	bool nss_offload;
 
-	for (i = 0; i < ab->hw_params.max_tx_ring; i++) {
-		if (BIT(ab->hw_params.hal_params->tcl2wbm_rbm_map[i].wbm_ring_num) &
-		    ab->hw_params.ring_mask->tx[grp_id])
-			ath11k_dp_tx_completion_handler(ab, i);
+	nss_offload = ab->nss.enabled;
+
+	if (!nss_offload) {
+		for (i = 0; i < ab->hw_params.max_tx_ring; i++) {
+			if (BIT(ab->hw_params.hal_params->tcl2wbm_rbm_map[i].wbm_ring_num) &
+			    ab->hw_params.ring_mask->tx[grp_id])
+				ath11k_dp_tx_completion_handler(ab, i);
+		}
 	}
 
-	if (ab->hw_params.ring_mask->rx_err[grp_id]) {
+	if (!nss_offload && ab->hw_params.ring_mask->rx_err[grp_id]) {
 		work_done = ath11k_dp_process_rx_err(ab, napi, budget);
 		budget -= work_done;
 		tot_work_done += work_done;
@@ -796,7 +818,7 @@ int ath11k_dp_service_srng(struct ath11k_base *ab,
 			goto done;
 	}
 
-	if (ab->hw_params.ring_mask->rx_wbm_rel[grp_id]) {
+	if (!nss_offload && ab->hw_params.ring_mask->rx_wbm_rel[grp_id]) {
 		work_done = ath11k_dp_rx_process_wbm_err(ab,
 							 napi,
 							 budget);
@@ -807,7 +829,7 @@ int ath11k_dp_service_srng(struct ath11k_base *ab,
 			goto done;
 	}
 
-	if (ab->hw_params.ring_mask->rx[grp_id]) {
+	if (!nss_offload && ab->hw_params.ring_mask->rx[grp_id]) {
 		i =  fls(ab->hw_params.ring_mask->rx[grp_id]) - 1;
 		work_done = ath11k_dp_process_rx(ab, i, napi,
 						 budget);
@@ -841,7 +863,7 @@ int ath11k_dp_service_srng(struct ath11k_base *ab,
 	if (ab->hw_params.ring_mask->reo_status[grp_id])
 		ath11k_dp_process_reo_status(ab);
 
-	for (i = 0; i < ab->num_radios; i++) {
+	for (i = 0; !nss_offload && i < ab->num_radios; i++) {
 		for (j = 0; j < ab->hw_params.num_rxdma_per_pdev; j++) {
 			int id = i * ab->hw_params.num_rxdma_per_pdev + j;
 

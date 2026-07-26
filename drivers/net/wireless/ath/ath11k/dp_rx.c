@@ -18,6 +18,7 @@
 #include "hal_rx.h"
 #include "dp_tx.h"
 #include "peer.h"
+#include "nss.h"
 
 #define ATH11K_DP_RX_FRAGMENT_TIMEOUT_MS (2 * HZ)
 
@@ -214,8 +215,8 @@ static inline u8 ath11k_dp_rx_h_mpdu_start_tid(struct ath11k_base *ab,
 	return ab->hw_params.hw_ops->rx_desc_get_mpdu_tid(desc);
 }
 
-static inline u16 ath11k_dp_rx_h_mpdu_start_peer_id(struct ath11k_base *ab,
-						    struct hal_rx_desc *desc)
+u16 ath11k_dp_rx_h_mpdu_start_peer_id(struct ath11k_base *ab,
+				      struct hal_rx_desc *desc)
 {
 	return ab->hw_params.hw_ops->rx_desc_get_mpdu_peer_id(desc);
 }
@@ -226,8 +227,8 @@ static inline u8 ath11k_dp_rx_h_msdu_end_l3pad(struct ath11k_base *ab,
 	return ab->hw_params.hw_ops->rx_desc_get_l3_pad_bytes(desc);
 }
 
-static inline bool ath11k_dp_rx_h_msdu_end_first_msdu(struct ath11k_base *ab,
-						      struct hal_rx_desc *desc)
+bool ath11k_dp_rx_h_msdu_end_first_msdu(struct ath11k_base *ab,
+					struct hal_rx_desc *desc)
 {
 	return ab->hw_params.hw_ops->rx_desc_get_first_msdu(desc);
 }
@@ -284,7 +285,7 @@ static inline void ath11k_dp_rxdesc_set_msdu_len(struct ath11k_base *ab,
 	ab->hw_params.hw_ops->rx_desc_set_msdu_len(desc, len);
 }
 
-static bool ath11k_dp_rx_h_attn_is_mcbc(struct ath11k_base *ab,
+bool ath11k_dp_rx_h_attn_is_mcbc(struct ath11k_base *ab,
 					struct hal_rx_desc *desc)
 {
 	struct rx_attention *attn = ath11k_dp_rx_get_attention(ab, desc);
@@ -499,7 +500,9 @@ static int ath11k_dp_rxdma_pdev_buf_setup(struct ath11k *ar)
 	struct dp_rxdma_ring *rx_ring = &dp->rx_refill_buf_ring;
 	int i;
 
-	ath11k_dp_rxdma_ring_buf_setup(ar, rx_ring, HAL_RXDMA_BUF);
+	/* RXDMA BUF ring is offloaded to NSS */
+	if (!ar->ab->nss.enabled)
+		ath11k_dp_rxdma_ring_buf_setup(ar, rx_ring, HAL_RXDMA_BUF);
 
 	if (ar->ab->hw_params.rxdma1_enable) {
 		rx_ring = &dp->rxdma_mon_buf_ring;
@@ -2061,7 +2064,7 @@ int ath11k_dp_rx_crypto_mic_len(struct ath11k *ar, enum hal_encrypt_type enctype
 	return 0;
 }
 
-static int ath11k_dp_rx_crypto_param_len(struct ath11k *ar,
+int ath11k_dp_rx_crypto_param_len(struct ath11k *ar,
 					 enum hal_encrypt_type enctype)
 {
 	switch (enctype) {
@@ -2089,7 +2092,7 @@ static int ath11k_dp_rx_crypto_param_len(struct ath11k *ar,
 	return 0;
 }
 
-static int ath11k_dp_rx_crypto_icv_len(struct ath11k *ar,
+int ath11k_dp_rx_crypto_icv_len(struct ath11k *ar,
 				       enum hal_encrypt_type enctype)
 {
 	switch (enctype) {
@@ -2822,6 +2825,22 @@ static void ath11k_dp_rx_process_received_packets(struct ath11k_base *ab,
 
 		ath11k_dp_rx_deliver_msdu(ar, napi, msdu, &rx_status);
 	}
+}
+
+void ath11k_dp_rx_from_nss(struct ath11k *ar, struct sk_buff *msdu,
+			   struct napi_struct *napi)
+{
+	struct ieee80211_rx_status rx_status = {0};
+	struct ath11k_skb_rxcb *rxcb;
+
+	rxcb = ATH11K_SKB_RXCB(msdu);
+
+	ath11k_dp_rx_h_ppdu(ar, rxcb->rx_desc, &rx_status);
+	ath11k_dp_rx_h_mpdu(ar, msdu, rxcb->rx_desc, &rx_status);
+
+	rx_status.flag |= RX_FLAG_SKIP_MONITOR | RX_FLAG_DUP_VALIDATED;
+
+	ath11k_dp_rx_deliver_msdu(ar, napi, msdu, &rx_status);
 }
 
 int ath11k_dp_process_rx(struct ath11k_base *ab, int ring_id,
@@ -5537,7 +5556,7 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 	struct sk_buff *skb;
 	struct sk_buff_head skb_list;
 	struct ath11k_peer *peer;
-	struct ath11k_sta *arsta;
+	struct ath11k_sta *arsta = NULL;
 	int num_buffs_reaped = 0;
 	u32 rx_buf_sz;
 	u16 log_type;
@@ -5607,6 +5626,8 @@ int ath11k_dp_rx_process_mon_status(struct ath11k_base *ab, int mac_id,
 		    (ppdu_info->ast_index != HAL_AST_IDX_INVALID)) {
 			arsta = (struct ath11k_sta *)peer->sta->drv_priv;
 			ath11k_dp_rx_update_peer_stats(arsta, ppdu_info);
+			if (ar->ab->nss.enabled)
+				ath11k_nss_update_sta_rxrate(ppdu_info, peer, NULL);
 		}
 
 		if (ath11k_debugfs_is_pktlog_peer_valid(ar, peer->addr))

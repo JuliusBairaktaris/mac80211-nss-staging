@@ -19,7 +19,6 @@
 #include <linux/suspend.h>
 #include <linux/of.h>
 
-#include "fw.h"
 #include "qmi.h"
 #include "htc.h"
 #include "wmi.h"
@@ -36,6 +35,8 @@
 #include "wow.h"
 #include "rx_desc.h"
 #include "coredump.h"
+#include "nss.h"
+#include "fw.h"
 
 #define SM(_v, _f) (((_v) << _f##_LSB) & _f##_MASK)
 
@@ -433,6 +434,9 @@ struct ath11k_vif {
 
 	struct ath11k_reg_tpc_power_info reg_tpc_info;
 	struct ath11k_mgmt_frame_stats mgmt_stats;
+#ifdef CPTCFG_ATH11K_NSS_SUPPORT
+	struct arvif_nss nss;
+#endif
 	/* Must be last - ends in a flexible-array member.
 	 *
 	 * FIXME: Driver should not copy struct ieee80211_chanctx_conf,
@@ -592,6 +596,9 @@ struct ath11k_sta {
 #endif
 
 	bool use_4addr_set;
+#ifdef CPTCFG_ATH11K_NSS_SUPPORT
+	struct ath11k_nss_sta_stats *nss_stats;
+#endif
 	u16 tcl_metadata;
 
 	/* Protected with ar->data_lock */
@@ -688,6 +695,9 @@ struct ath11k {
 	struct ath11k_pdev *pdev;
 	struct ieee80211_hw *hw;
 	struct ath11k_pdev_wmi *wmi;
+#ifdef CPTCFG_ATH11K_NSS_SUPPORT
+	struct ath11k_nss nss;
+#endif
 	struct ath11k_pdev_dp dp;
 	u8 mac_addr[ETH_ALEN];
 	struct ath11k_he ar_he;
@@ -965,6 +975,7 @@ struct ath11k_base {
 
 	void __iomem *mem;
 	void __iomem *mem_ce;
+	dma_addr_t mem_pa;
 	unsigned long mem_len;
 
 	struct {
