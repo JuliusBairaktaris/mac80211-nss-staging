@@ -2280,9 +2280,28 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 			txq_size += sizeof(struct txq_info) +
 				    local->hw.txq_data_size;
 
+#ifdef CPTCFG_MAC80211_NSS_SUPPORT
+		/*
+		 * The NSS offload data path bypasses the mac80211 TXQs:
+		 * every frame takes the netdev transmit-queue lock straight
+		 * into the NSS virtual-device redirect, so with the single
+		 * default queue all sender threads serialize on one lock
+		 * (measured ceiling ~1 Gbit/s for locally sourced transmit
+		 * on IPQ8074). Give the interface one transmit queue per
+		 * CPU: neither data netdev_ops implements ndo_select_queue,
+		 * so the core flow-hashes across the queues, and the
+		 * wake_tx_queue world never touches netdev subqueues, so
+		 * the extra queues are invisible to the host-mode path.
+		 */
+		ndev = alloc_netdev_mqs(size + txq_size,
+					name, name_assign_type,
+					ieee80211_if_setup,
+					num_possible_cpus(), 1);
+#else
 		ndev = alloc_netdev_mqs(size + txq_size,
 					name, name_assign_type,
 					ieee80211_if_setup, 1, 1);
+#endif
 		if (!ndev)
 			return -ENOMEM;
 
