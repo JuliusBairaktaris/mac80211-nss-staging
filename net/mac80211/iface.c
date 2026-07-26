@@ -1304,7 +1304,7 @@ void ieee80211_del_virtual_monitor(struct ieee80211_local *local)
 /* This callback is registered for nss redirect to receive packet exceptioned from nss in Rx path.
  * When packet does not match any of the ecm rules is redirected back here.
  */
-void receive_from_nss(struct net_device *dev, struct sk_buff *sk_buff, struct napi_struct *napi)
+static void receive_from_nss(struct net_device *dev, struct sk_buff *sk_buff, struct napi_struct *napi)
 {
 	struct net_device *netdev;
 	struct sk_buff *skb;
