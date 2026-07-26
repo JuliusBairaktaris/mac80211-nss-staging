@@ -6846,6 +6846,7 @@ static void ath11k_mac_op_stop(struct ieee80211_hw *hw, bool suspend)
 	int ret;
 
 	ath11k_mac_drain_tx(ar);
+	ath11k_dp_tx_complete_pending(ar);
 
 	mutex_lock(&ar->conf_mutex);
 	ret = ath11k_mac_config_mon_status_default(ar, false);
