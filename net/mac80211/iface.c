@@ -1446,6 +1446,13 @@ int ieee80211_do_open(struct wireless_dev *wdev, bool coming_up)
 			ieee80211_set_vif_encap_ops(sdata);
 		} else {
 			netif_carrier_off(dev);
+
+			if (ieee80211_hw_check(&local->hw, SUPPORTS_NSS_OFFLOAD)) {
+				ieee80211_set_sdata_offload_flags(sdata);
+				res = drv_add_interface(local, sdata);
+				if (res)
+					goto err_stop;
+			}
 		}
 		break;
 	case NL80211_IFTYPE_MONITOR:
