@@ -101,6 +101,13 @@ do {	\
 	u64_stats_update_end(&tstats->syncp);	\
 } while (0)
 
+enum ath11k_nss_vdev_cmd {
+	ATH11K_NSS_WIFI_VDEV_CFG_AP_BRIDGE_CMD,
+	ATH11K_NSS_WIFI_VDEV_SECURITY_TYPE_CMD,
+	ATH11K_NSS_WIFI_VDEV_ENCAP_TYPE_CMD,
+	ATH11K_NSS_WIFI_VDEV_DECAP_TYPE_CMD,
+};
+
 enum ath11k_nss_opmode {
 	ATH11K_NSS_OPMODE_UNKNOWN,
 	ATH11K_NSS_OPMODE_AP,
@@ -192,7 +199,8 @@ struct ath11k_soc_nss {
 
 #ifdef CPTCFG_ATH11K_NSS_SUPPORT
 int ath11k_nss_tx(struct ath11k_vif *arvif, struct sk_buff *skb);
-int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, int cmd, int val);
+int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, enum ath11k_nss_vdev_cmd cmd,
+			    int val);
 int ath11k_nss_vdev_create(struct ath11k_vif *arvif);
 void ath11k_nss_vdev_delete(struct ath11k_vif *arvif);
 int ath11k_nss_vdev_up(struct ath11k_vif *arvif);
@@ -219,7 +227,8 @@ static inline int ath11k_nss_tx(struct ath11k_vif *arvif, struct sk_buff *skb)
 	return 0;
 }
 
-static inline int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, int cmd, int val)
+static inline int ath11k_nss_vdev_set_cmd(struct ath11k_vif *arvif, enum ath11k_nss_vdev_cmd cmd,
+					  int val)
 {
 	return 0;
 }
