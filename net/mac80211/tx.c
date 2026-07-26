@@ -4856,6 +4856,17 @@ void ieee80211_8023_xmit_ap(struct ieee80211_sub_if_data *sdata,
 	spin_lock_irqsave(&local->queue_stop_reason_lock, flags);
 
 	if (local->queue_stop_reasons[q] || !skb_queue_empty(&local->pending[q])) {
+		/*
+		 * A frame queued here after ieee80211_do_stop() flushed the
+		 * pending queues for this interface is never freed through
+		 * mac80211 again and would leak its ack status entry ("Have
+		 * pending ack frames!" on hw free), so drop it properly.
+		 */
+		if (unlikely(!test_bit(SDATA_STATE_RUNNING, &sdata->state))) {
+			spin_unlock_irqrestore(&local->queue_stop_reason_lock, flags);
+			ieee80211_free_txskb(&local->hw, skb);
+			return;
+		}
 		skb_queue_tail(&local->pending[q], skb);
 		spin_unlock_irqrestore(&local->queue_stop_reason_lock, flags);
 		return;
