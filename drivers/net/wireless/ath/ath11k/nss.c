@@ -130,7 +130,7 @@ static void ath11k_nss_wifili_link_desc_return(struct ath11k_base *ab,
 
 exit:
 	ath11k_hal_srng_access_end(ab, srng);
-	spin_unlock(&srng->lock);
+	spin_unlock_bh(&srng->lock);
 }
 
 static void ath11k_nss_get_peer_stats(struct ath11k_base *ab, struct nss_wifili_peer_stats *stats)
@@ -712,11 +712,13 @@ static void ath11k_nss_wds_type_rx(struct ath11k_vif *arvif, struct net_device *
 
 	wdev = dev->ieee80211_ptr;
 	if (!wdev) {
+		spin_unlock_bh(&ab->base_lock);
 		return;
 	}
 
 	vif = wdev_to_ieee80211_vif(wdev);
 	if (!vif) {
+		spin_unlock_bh(&ab->base_lock);
 		return;
 	}
 
