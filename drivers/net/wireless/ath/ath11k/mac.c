@@ -6684,7 +6684,7 @@ static void ath11k_mac_wait_reconfigure(struct ath11k_base *ab)
 	recovery_start_count = atomic_inc_return(&ab->recovery_start_count);
 	ath11k_dbg(ab, ATH11K_DBG_MAC, "recovery start count %d\n", recovery_start_count);
 
-	if (recovery_start_count == ab->num_radios) {
+	if (recovery_start_count == atomic_read(&ab->recovery_expected)) {
 		complete(&ab->recovery_start);
 		ath11k_dbg(ab, ATH11K_DBG_MAC, "recovery started success\n");
 	}
@@ -9497,13 +9497,13 @@ ath11k_mac_op_reconfig_complete(struct ieee80211_hw *hw,
 			ath11k_dbg(ab, ATH11K_DBG_BOOT,
 				   "recovery count %d\n", recovery_count);
 			/* When there are multiple radios in an SOC,
-			 * the recovery has to be done for each radio
+			 * the recovery has to be done for each radio that
+			 * was restarted - not for every radio the SOC has,
+			 * since a radio that was off, wedged or in FTM never
+			 * gets here.
 			 */
-			if (recovery_count == ab->num_radios) {
-				atomic_dec(&ab->reset_count);
-				complete(&ab->reset_complete);
-				ab->is_reset = false;
-				atomic_set(&ab->fail_cont_count, 0);
+			if (recovery_count == atomic_read(&ab->recovery_expected)) {
+				ath11k_core_reset_finish(ab);
 				ath11k_dbg(ab, ATH11K_DBG_BOOT, "reset success\n");
 			}
 		}
