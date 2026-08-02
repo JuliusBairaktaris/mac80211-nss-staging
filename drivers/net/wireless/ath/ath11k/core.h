@@ -1103,6 +1103,10 @@ struct ath11k_base {
 	atomic_t reset_count;
 	atomic_t recovery_count;
 	atomic_t recovery_start_count;
+	/* number of radios this recovery actually restarted, and so the
+	 * number that will report back through the two counters above
+	 */
+	atomic_t recovery_expected;
 	bool is_reset;
 	struct completion reset_complete;
 	struct completion reconfigure_complete;
@@ -1376,6 +1380,7 @@ int ath11k_core_resume(struct ath11k_base *ab);
 int ath11k_core_suspend(struct ath11k_base *ab);
 int ath11k_core_suspend_late(struct ath11k_base *ab);
 void ath11k_core_pre_reconfigure_recovery(struct ath11k_base *ab);
+void ath11k_core_reset_finish(struct ath11k_base *ab);
 bool ath11k_core_coldboot_cal_support(struct ath11k_base *ab);
 
 const struct firmware *ath11k_core_firmware_request(struct ath11k_base *ab,
