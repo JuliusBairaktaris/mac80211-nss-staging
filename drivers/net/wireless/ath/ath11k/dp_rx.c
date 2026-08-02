@@ -746,9 +746,9 @@ void ath11k_dp_reo_cmd_list_cleanup(struct ath11k_base *ab)
 		list_del(&cmd_queue->list);
 		rx_tid = &cmd_queue->data;
 		if (rx_tid->vaddr_unaligned) {
-			dma_unmap_single(ab->dev, rx_tid->paddr,
-					 rx_tid->size, DMA_BIDIRECTIONAL);
-			kfree(rx_tid->vaddr_unaligned);
+			dma_free_noncoherent(ab->dev, rx_tid->unaligned_size,
+					     rx_tid->vaddr_unaligned,
+					     rx_tid->paddr_unaligned, DMA_BIDIRECTIONAL);
 			rx_tid->vaddr_unaligned = NULL;
 		}
 		kfree(cmd_queue);
@@ -950,6 +950,19 @@ void ath11k_peer_rx_tid_delete(struct ath11k *ar,
 	elem->peer_id = peer->peer_id;
 	elem->tid = tid;
 	memcpy(&elem->data, rx_tid, sizeof(*rx_tid));
+
+	/* The queue element owns the REO descriptor from here on, and the loop
+	 * below rebinds rx_tid to elem->data - so the clears it performs never
+	 * reach the peer. Drop the peer's second reference to the same
+	 * descriptor now, leaving the frag fields for
+	 * ath11k_dp_rx_frags_cleanup(), which its caller runs next.
+	 */
+	rx_tid->active = false;
+	rx_tid->vaddr_unaligned = NULL;
+	rx_tid->paddr = 0;
+	rx_tid->size = 0;
+	rx_tid->pending_desc_size = 0;
+	rx_tid->unaligned_size = 0;
 
 	spin_lock_bh(&dp->reo_cmd_update_queue_lock);
 	list_add_tail(&elem->list, &dp->reo_cmd_update_rx_queue_list);
