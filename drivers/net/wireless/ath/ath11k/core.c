@@ -2550,11 +2550,43 @@ void ath11k_core_pre_reconfigure_recovery(struct ath11k_base *ab)
 	reinit_completion(&ab->driver_recovery);
 }
 
+/* Every radio the recovery restarted has reported back: the reset is over.
+ * Idempotent, because the no-radio case below ends the reset without any
+ * reporter and a radio left over from a previous recovery can still arrive.
+ */
+void ath11k_core_reset_finish(struct ath11k_base *ab)
+{
+	if (!ab->is_reset)
+		return;
+
+	atomic_dec(&ab->reset_count);
+	complete(&ab->reset_complete);
+	ab->is_reset = false;
+	atomic_set(&ab->fail_cont_count, 0);
+}
+
 static void ath11k_core_post_reconfigure_recovery(struct ath11k_base *ab)
 {
 	struct ath11k *ar;
 	struct ath11k_pdev *pdev;
-	int i;
+	int i, expected = 0;
+
+	/* Only a radio in ATH11K_STATE_ON is restarted below, and only a
+	 * restarted radio comes back through ath11k_mac_wait_reconfigure() and
+	 * ath11k_mac_op_reconfig_complete(). Publish how many that is before
+	 * the first ieee80211_restart_hw() can be acted on, because both of
+	 * those compared against ab->num_radios: with one radio off, wedged or
+	 * in FTM the count never got there, so ab->is_reset was never cleared
+	 * and every later ATH11K_QMI_EVENT_SERVER_EXIT skipped
+	 * ath11k_core_pre_reconfigure_recovery() for the lifetime of the
+	 * device.
+	 */
+	for (i = 0; i < ab->num_radios; i++) {
+		ar = ab->pdevs[i].ar;
+		if (ar && ar->state == ATH11K_STATE_ON)
+			expected++;
+	}
+	atomic_set(&ab->recovery_expected, expected);
 
 	for (i = 0; i < ab->num_radios; i++) {
 		pdev = &ab->pdevs[i];
@@ -2592,6 +2624,16 @@ static void ath11k_core_post_reconfigure_recovery(struct ath11k_base *ab)
 
 		mutex_unlock(&ar->conf_mutex);
 	}
+
+	/* With no radio to restart nothing will ever report back, so end the
+	 * reset here instead of latching is_reset and burning the full
+	 * ATH11K_RECOVER_START_TIMEOUT_HZ on the way.
+	 */
+	if (!expected && ab->is_reset) {
+		complete(&ab->recovery_start);
+		ath11k_core_reset_finish(ab);
+	}
+
 	complete(&ab->driver_recovery);
 }
 
