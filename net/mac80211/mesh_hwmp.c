@@ -475,7 +475,7 @@ static u32 hwmp_route_info_get(struct ieee80211_sub_if_data *sdata,
 			if (next_hop)
 				ether_addr_copy(old_next_hop_addr, next_hop->sta.addr);
 			if (next_hop != sta) {
-				mpath->path_change_count++;
+				atomic_inc(&mpath->path_change_count);
 				flush_mpath = true;
 			}
 			mesh_path_assign_nexthop(mpath, sta);
@@ -536,7 +536,7 @@ static u32 hwmp_route_info_get(struct ieee80211_sub_if_data *sdata,
 			if (next_hop)
 				ether_addr_copy(old_next_hop_addr, next_hop->sta.addr);
 			if (next_hop != sta) {
-				mpath->path_change_count++;
+				atomic_inc(&mpath->path_change_count);
 				flush_mpath = true;
 			}
 			mesh_path_assign_nexthop(mpath, sta);

@@ -127,7 +127,7 @@ struct mesh_path {
 	unsigned long fast_tx_check;
 	bool is_root;
 	bool is_gate;
-	u32 path_change_count;
+	atomic_t path_change_count;
 };
 
 #define MESH_FAST_TX_CACHE_MAX_SIZE		512
