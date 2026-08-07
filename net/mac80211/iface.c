@@ -2397,6 +2397,14 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 		    ieee80211_hw_check(&local->hw, SUPPORTS_TX_ENCAP_OFFLOAD))
 			ndev->features |= NETIF_F_HW_CSUM;
 
+		/*
+		 * Nothing behind the NSS mesh encap node completes a
+		 * CHECKSUM_PARTIAL: the placeholder sum reaches the air.
+		 */
+		if (type == NL80211_IFTYPE_MESH_POINT &&
+		    ieee80211_hw_check(&local->hw, SUPPORTS_MESH_NSS_OFFLOAD))
+			ndev->features &= ~NETIF_F_HW_CSUM;
+
 		ndev->hw_features |= ndev->features &
 					MAC80211_SUPPORTED_FEATURES_TX;
 		sdata->vif.netdev_features = local->hw.netdev_features;
