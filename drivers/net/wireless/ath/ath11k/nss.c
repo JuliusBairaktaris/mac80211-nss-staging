@@ -534,7 +534,7 @@ ath11k_nss_wifili_ext_callback_fn(struct ath11k_base *ab, struct sk_buff *skb,
 		ath11k_nss_process_mic_error(ab, skb);
 		break;
 	default:
-		kfree(skb);
+		dev_kfree_skb_any(skb);
 		break;
 	}
 }
