@@ -3451,6 +3451,12 @@ static int ath11k_nss_pdev_deinit(struct ath11k_base *ab, int radio_id)
 	int dyn_if_type;
 	int ret;
 
+	/* A recovery that fails after ath11k_mac_destroy() leaves the radios
+	 * freed but nss.enabled set, so the next teardown lands here with none.
+	 */
+	if (!ar)
+		return -ENODEV;
+
 	ath11k_dbg(ab, ATH11K_DBG_NSS, "NSS pdev %d deinit\n", radio_id);
 	dyn_if_type = ath11k_nss_get_dynamic_interface_type(ab);
 
