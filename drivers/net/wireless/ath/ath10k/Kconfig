@@ -51,6 +51,7 @@ config ATH10K_SNOC
 	depends on ARCH_QCOM || COMPILE_TEST
 	depends on QCOM_SMEM
 	depends on QCOM_RPROC_COMMON || QCOM_RPROC_COMMON=n
+	depends on POWER_SEQUENCING
 	depends on QCOM_SCM
 	select QCOM_QMI_HELPERS
 	help

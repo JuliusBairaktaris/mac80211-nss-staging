@@ -4,6 +4,14 @@
 #include_next <linux/platform_device.h>
 #include <linux/version.h>
 
+#if LINUX_VERSION_IS_LESS(7,2,0)
+/*
+ * The device id structs moved to linux/device-id/, which linux/platform_device.h
+ * pulls in since 7.2. Before that the definitions were not included from here.
+ */
+#include <linux/mod_devicetable.h>
+#endif
+
 #ifndef module_platform_driver_probe
 #define module_platform_driver_probe(__platform_driver, __platform_probe) \
 static int __init __platform_driver##_init(void) \

@@ -157,7 +157,6 @@ config LIBIPW
 	depends on PCI && CFG80211
 	depends on WIRELESS_EXT
 	depends on CRYPTO
-	depends on CRYPTO_MICHAEL_MIC
 	select BPAUTO_CRYPTO_LIB_ARC4
 	depends on CRC32
 	help

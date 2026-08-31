@@ -88,3 +88,14 @@ config BPAUTO_BUILD_CRYPTO_LIB_ARC4
 	depends on !(CRYPTO_LIB_ARC4=y || CRYPTO_LIB_ARC4=m)
 	#h-file crypto/arc4.h
 	#c-file lib/crypto/arc4.c
+
+config BPAUTO_CRYPTO_LIB_AES_CBC_MACS
+	bool
+
+config BPAUTO_BUILD_CRYPTO_LIB_AES_CBC_MACS
+	bool
+	default y if BPAUTO_CRYPTO_LIB_AES_CBC_MACS
+	depends on !(CRYPTO_LIB_AES_CBC_MACS=y || CRYPTO_LIB_AES_CBC_MACS=m)
+	#h-file crypto/aes.h
+	#h-file crypto/aes-cbc-macs.h
+	#c-file lib/crypto/aes.c

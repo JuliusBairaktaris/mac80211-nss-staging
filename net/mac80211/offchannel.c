@@ -8,7 +8,7 @@
  * Copyright 2006-2007	Jiri Benc <jbenc@suse.cz>
  * Copyright 2007, Michael Wu <flamingice@sourmilk.net>
  * Copyright 2009	Johannes Berg <johannes@sipsolutions.net>
- * Copyright (C) 2019, 2022-2025 Intel Corporation
+ * Copyright (C) 2019, 2022-2026 Intel Corporation
  */
 #include <linux/export.h>
 #include <net/mac80211.h>
@@ -166,35 +166,6 @@ void ieee80211_offchannel_return(struct ieee80211_local *local)
 	ieee80211_wake_queues_by_reason(&local->hw, IEEE80211_MAX_QUEUE_MAP,
 					IEEE80211_QUEUE_STOP_REASON_OFFCHANNEL,
 					false);
-}
-
-u32 ieee80211_offchannel_radio_mask(struct ieee80211_local *local)
-{
-	const struct wiphy_radio *radio;
-	struct ieee80211_roc_work *roc;
-	u32 mask = 0;
-	int r;
-
-	for (r = 0; r < local->hw.wiphy->n_radio; r++) {
-		radio = &local->hw.wiphy->radio[r];
-
-		list_for_each_entry(roc, &local->roc_list, list) {
-			struct cfg80211_chan_def chandef = {};
-
-			if (!roc->started)
-				continue;
-
-			cfg80211_chandef_create(&chandef, roc->chan,
-						NL80211_CHAN_NO_HT);
-			if (!cfg80211_radio_chandef_valid(radio, &chandef))
-				continue;
-
-			mask |= BIT(r);
-			break;
-		}
-	}
-
-	return mask;
 }
 
 static void ieee80211_roc_notify_destroy(struct ieee80211_roc_work *roc)
@@ -384,9 +355,7 @@ static void _ieee80211_start_next_roc(struct ieee80211_local *local)
 		 * Note: scan can't run, tmp_channel is what we use, so this
 		 * must be the currently active channel.
 		 */
-		roc->on_channel = roc->chan == local->hw.conf.chandef.chan &&
-				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_5 &&
-				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_10;
+		roc->on_channel = roc->chan == local->hw.conf.chandef.chan;
 
 		/* start this ROC */
 		ieee80211_recalc_idle(local);
@@ -595,10 +564,8 @@ static int ieee80211_start_roc_work(struct ieee80211_local *local,
 				    enum ieee80211_roc_type type)
 {
 	struct ieee80211_roc_work *roc, *tmp;
-	struct cfg80211_chan_def chandef = {};
 	bool queued = false, combine_started = true;
 	struct cfg80211_scan_request *req;
-	u32 radio_mask;
 	int ret;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
@@ -610,13 +577,7 @@ static int ieee80211_start_roc_work(struct ieee80211_local *local,
 	if (!local->emulate_chanctx && !local->ops->remain_on_channel)
 		return -EOPNOTSUPP;
 
-	cfg80211_chandef_create(&chandef, channel, NL80211_CHAN_NO_HT);
-	radio_mask = ieee80211_chandef_radio_mask(local, &chandef);
-	if (!ieee80211_can_leave_ch(sdata, req, radio_mask) &&
-	    !ieee80211_scanning_busy(local, &chandef))
-		return -EBUSY;
-
-	roc = kzalloc(sizeof(*roc), GFP_KERNEL);
+	roc = kzalloc_obj(*roc);
 	if (!roc)
 		return -ENOMEM;
 
@@ -653,7 +614,8 @@ static int ieee80211_start_roc_work(struct ieee80211_local *local,
 	req = wiphy_dereference(local->hw.wiphy, local->scan_req);
 
 	/* if there's no need to queue, handle it immediately */
-	if (list_empty(&local->roc_list) && !local->scanning) {
+	if (list_empty(&local->roc_list) &&
+	    !local->scanning && !ieee80211_is_radar_required(local, req)) {
 		/* if not HW assist, just queue & schedule work */
 		if (!local->ops->remain_on_channel) {
 			list_add_tail(&roc->list, &local->roc_list);
@@ -742,7 +704,8 @@ static int ieee80211_start_roc_work(struct ieee80211_local *local,
 
 int ieee80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 				struct ieee80211_channel *chan,
-				unsigned int duration, u64 *cookie)
+				unsigned int duration, u64 *cookie,
+				const u8 *rx_addr)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_WDEV_TO_SUB_IF(wdev);
 	struct ieee80211_local *local = sdata->local;
@@ -930,9 +893,14 @@ int ieee80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		}
 		break;
 	case NL80211_IFTYPE_P2P_DEVICE:
+	case NL80211_IFTYPE_PD:
 		need_offchan = true;
 		break;
 	case NL80211_IFTYPE_NAN:
+		break;
+	case NL80211_IFTYPE_NAN_DATA:
+		if (is_multicast_ether_addr(mgmt->da))
+			return -EOPNOTSUPP;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -947,7 +915,8 @@ int ieee80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	/* Check if the operating channel is the requested channel */
 	if (!params->chan && mlo_sta) {
 		need_offchan = false;
-	} else if (sdata->vif.type == NL80211_IFTYPE_NAN) {
+	} else if (sdata->vif.type == NL80211_IFTYPE_NAN ||
+		   sdata->vif.type == NL80211_IFTYPE_NAN_DATA) {
 		/* Frames can be sent during NAN schedule */
 	} else if (!need_offchan) {
 		struct ieee80211_chanctx_conf *chanctx_conf = NULL;

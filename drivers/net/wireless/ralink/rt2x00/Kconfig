@@ -70,7 +70,6 @@ config RT2800PCI
 	select RT2X00_LIB_MMIO
 	select RT2X00_LIB_PCI
 	select RT2X00_LIB_FIRMWARE
-	select RT2X00_LIB_EEPROM
 	select RT2X00_LIB_CRYPTO
 	depends on EEPROM_93CX6
 	help
@@ -214,7 +213,6 @@ config RT2800SOC
 	select RT2X00_LIB_MMIO
 	select RT2X00_LIB_CRYPTO
 	select RT2X00_LIB_FIRMWARE
-	select RT2X00_LIB_EEPROM
 	select RT2800_LIB
 	select RT2800_LIB_MMIO
 	select MTD if SOC_RT288X || SOC_RT305X
@@ -260,9 +258,6 @@ config RT2X00_LIB_FIRMWARE
 	depends on FW_LOADER
 
 config RT2X00_LIB_CRYPTO
-	bool
-
-config RT2X00_LIB_EEPROM
 	bool
 
 config RT2X00_LIB_LEDS

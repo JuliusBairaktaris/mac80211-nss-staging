@@ -71,6 +71,45 @@ static inline void sdio_retune_crc_enable(struct sdio_func *func)
 }
 #endif /* < 5.2 */
 
+#if LINUX_VERSION_IS_LESS(7,0,0)
+/*
+ * The SDIO bus gained a shutdown callback in 7.0. Older kernels have no
+ * bus level shutdown, so keep the field to let drivers compile. It is
+ * placed behind drv so that the struct stays layout compatible with the
+ * kernel one and can be passed to the registration helpers.
+ */
+struct backport_sdio_driver {
+	char *name;
+	const struct sdio_device_id *id_table;
+
+	int (*probe)(struct sdio_func *, const struct sdio_device_id *);
+	void (*remove)(struct sdio_func *);
+
+	struct device_driver drv;
+
+	void (*shutdown)(struct sdio_func *);
+};
+
+static inline int
+backport_sdio_register_driver(struct backport_sdio_driver *drv,
+			      struct module *owner)
+{
+	return __sdio_register_driver((struct sdio_driver *)drv, owner);
+}
+
+static inline void
+backport_sdio_unregister_driver(struct backport_sdio_driver *drv)
+{
+	sdio_unregister_driver((struct sdio_driver *)drv);
+}
+
+#define sdio_driver backport_sdio_driver
+#undef sdio_register_driver
+#define sdio_register_driver(drv) \
+	backport_sdio_register_driver(drv, THIS_MODULE)
+#define sdio_unregister_driver backport_sdio_unregister_driver
+#endif /* < 7.0 */
+
 #ifndef module_sdio_driver
 /**
  * module_sdio_driver() - Helper macro for registering a SDIO driver

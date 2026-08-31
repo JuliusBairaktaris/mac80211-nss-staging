@@ -2565,19 +2565,11 @@ int ath9k_hw_fill_cap_info(struct ath_hw *ah)
 
 	eeval = ah->eep_ops->get_eeprom(ah, EEP_OP_MODE);
 
-	if (eeval & AR5416_OPFLAGS_11A) {
-		if (ah->disable_5ghz)
-			ath_warn(common, "disabling 5GHz band\n");
-		else
-			pCap->hw_caps |= ATH9K_HW_CAP_5GHZ;
-	}
+	if (eeval & AR5416_OPFLAGS_11A)
+		pCap->hw_caps |= ATH9K_HW_CAP_5GHZ;
 
-	if (eeval & AR5416_OPFLAGS_11G) {
-		if (ah->disable_2ghz)
-			ath_warn(common, "disabling 2GHz band\n");
-		else
-			pCap->hw_caps |= ATH9K_HW_CAP_2GHZ;
-	}
+	if (eeval & AR5416_OPFLAGS_11G)
+		pCap->hw_caps |= ATH9K_HW_CAP_2GHZ;
 
 	if ((pCap->hw_caps & (ATH9K_HW_CAP_2GHZ | ATH9K_HW_CAP_5GHZ)) == 0) {
 		ath_err(common, "both bands are disabled\n");
@@ -2793,11 +2785,14 @@ static void ath9k_hw_gpio_cfg_soc(struct ath_hw *ah, u32 gpio, bool out,
 	if (ah->gpiods[gpio])
 		return;
 
-	/* Obtains a system specific GPIO descriptor from another GPIO controller */
+	/*
+	 * Obtains a system specific GPIO descriptor from another GPIO controller.
+	 * Ideally this should come from the device tree, this is a legacy code
+	 * path.
+	 */
 	gpiod = gpiod_get_index(NULL, "ath9k", gpio, flags);
-
-	if (IS_ERR(gpiod)) {
-		err = PTR_ERR(gpiod);
+	err = PTR_ERR_OR_ZERO(gpiod);
+	if (err) {
 		ath_err(ath9k_hw_common(ah), "request GPIO%d failed:%d\n",
 			gpio, err);
 		return;
@@ -2864,12 +2859,12 @@ void ath9k_hw_gpio_free(struct ath_hw *ah, u32 gpio)
 	if (!AR_SREV_SOC(ah))
 		return;
 
-	WARN_ON(gpio >= ah->caps.num_gpio_pins);
-
 	if (ah->gpiods[gpio]) {
 		gpiod_put(ah->gpiods[gpio]);
 		ah->gpiods[gpio] = NULL;
 	}
+
+	WARN_ON(gpio >= ah->caps.num_gpio_pins);
 }
 EXPORT_SYMBOL(ath9k_hw_gpio_free);
 
@@ -3213,7 +3208,7 @@ struct ath_gen_timer *ath_gen_timer_alloc(struct ath_hw *ah,
 	    !AR_SREV_9300_20_OR_LATER(ah))
 		return NULL;
 
-	timer = kzalloc(sizeof(struct ath_gen_timer), GFP_KERNEL);
+	timer = kzalloc_obj(struct ath_gen_timer);
 	if (timer == NULL)
 		return NULL;
 

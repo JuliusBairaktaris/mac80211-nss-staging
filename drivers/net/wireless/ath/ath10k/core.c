@@ -1187,7 +1187,7 @@ static int ath10k_download_fw(struct ath10k *ar)
 	u32 address, data_len;
 	const void *data;
 	int ret;
-	struct pm_qos_request latency_qos;
+	struct pm_qos_request latency_qos = {};
 
 	address = ar->hw_params.patch_load_addr;
 
@@ -1221,7 +1221,6 @@ static int ath10k_download_fw(struct ath10k *ar)
 			    ret);
 	}
 
-	memset(&latency_qos, 0, sizeof(latency_qos));
 	cpu_latency_qos_add_request(&latency_qos, 0);
 
 	ret = ath10k_bmi_fast_download(ar, address, data, data_len);
@@ -3354,7 +3353,7 @@ EXPORT_SYMBOL(ath10k_core_stop);
  */
 static int ath10k_core_probe_fw(struct ath10k *ar)
 {
-	struct bmi_target_info target_info;
+	struct bmi_target_info target_info = {};
 	int ret = 0;
 
 	ret = ath10k_hif_power_up(ar, ATH10K_FIRMWARE_MODE_NORMAL);
@@ -3365,7 +3364,6 @@ static int ath10k_core_probe_fw(struct ath10k *ar)
 
 	switch (ar->hif.bus) {
 	case ATH10K_BUS_SDIO:
-		memset(&target_info, 0, sizeof(target_info));
 		ret = ath10k_bmi_get_target_info_sdio(ar, &target_info);
 		if (ret) {
 			ath10k_err(ar, "could not get target info (%d)\n", ret);
@@ -3377,7 +3375,6 @@ static int ath10k_core_probe_fw(struct ath10k *ar)
 	case ATH10K_BUS_PCI:
 	case ATH10K_BUS_AHB:
 	case ATH10K_BUS_USB:
-		memset(&target_info, 0, sizeof(target_info));
 		ret = ath10k_bmi_get_target_info(ar, &target_info);
 		if (ret) {
 			ath10k_err(ar, "could not get target info (%d)\n", ret);
@@ -3387,7 +3384,6 @@ static int ath10k_core_probe_fw(struct ath10k *ar)
 		ar->hw->wiphy->hw_version = target_info.version;
 		break;
 	case ATH10K_BUS_SNOC:
-		memset(&target_info, 0, sizeof(target_info));
 		ret = ath10k_hif_get_target_info(ar, &target_info);
 		if (ret) {
 			ath10k_err(ar, "could not get target info (%d)\n", ret);

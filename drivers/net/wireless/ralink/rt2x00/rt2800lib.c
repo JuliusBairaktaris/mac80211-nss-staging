@@ -24,6 +24,8 @@
 #include <linux/crc-ccitt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/nvmem-consumer.h>
+#include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/of.h>
 
@@ -11055,6 +11057,16 @@ static void rt2800_efuse_read(struct rt2x00_dev *rt2x00dev, unsigned int i)
 	mutex_unlock(&rt2x00dev->csr_mutex);
 }
 
+int rt2800_read_eeprom_data(struct rt2x00_dev *rt2x00dev)
+{
+	size_t len = rt2x00dev->ops->eeprom_size / sizeof(u16);
+	struct device *dev = rt2x00dev->dev;
+
+	return device_property_read_u16_array(dev, "ralink,eeprom-data",
+			rt2x00dev->eeprom, len);
+}
+EXPORT_SYMBOL_GPL(rt2800_read_eeprom_data);
+
 int rt2800_read_eeprom_efuse(struct rt2x00_dev *rt2x00dev)
 {
 	unsigned int i;
@@ -11065,6 +11077,130 @@ int rt2800_read_eeprom_efuse(struct rt2x00_dev *rt2x00dev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(rt2800_read_eeprom_efuse);
+
+int rt2800_read_eeprom_file(struct rt2x00_dev *rt2x00dev)
+{
+	struct device *dev = rt2x00dev->dev;
+	const struct firmware *ee;
+	const char *ee_name;
+	int retval;
+
+	if (device_property_read_string(dev, "ralink,eeprom", &ee_name))  {
+		rt2x00_err(rt2x00dev, "Required EEPROM name is missing.");
+		return -EINVAL;
+	}
+
+	rt2x00_info(rt2x00dev, "Loading EEPROM data from '%s'.\n", ee_name);
+
+	retval = request_firmware(&ee, ee_name, rt2x00dev->dev);
+	if (retval) {
+		rt2x00_err(rt2x00dev, "Failed to request EEPROM.\n");
+		return retval;
+	}
+
+	if (!ee || !ee->size || !ee->data) {
+		rt2x00_err(rt2x00dev, "Failed to read EEPROM file.\n");
+		return -ENOENT;
+	}
+
+	if (ee->size != rt2x00dev->ops->eeprom_size) {
+		rt2x00_err(rt2x00dev,
+			"EEPROM file size is invalid, it should be %d bytes\n",
+			rt2x00dev->ops->eeprom_size);
+		retval = -EINVAL;
+		goto err_release_ee;
+	}
+
+	memcpy(rt2x00dev->eeprom, ee->data, rt2x00dev->ops->eeprom_size);
+
+err_release_ee:
+	release_firmware(ee);
+	return retval;
+}
+EXPORT_SYMBOL_GPL(rt2800_read_eeprom_file);
+
+#if IS_ENABLED(CONFIG_SOC_RT288X) || IS_ENABLED(CONFIG_SOC_RT305X)
+int rt2800_read_eeprom_mtd(struct rt2x00_dev *rt2x00dev)
+{
+	struct device_node *np = rt2x00dev->dev->of_node, *mtd_np = NULL;
+	int size, offset = 0;
+	struct mtd_info *mtd;
+	const char *part;
+	const __be32 *list;
+	phandle phandle;
+	size_t retlen;
+	int ret;
+
+	list = of_get_property(np, "ralink,mtd-eeprom", &size);
+	if (!list)
+		return -ENOENT;
+
+	phandle = be32_to_cpup(list++);
+	if (phandle)
+		mtd_np = of_find_node_by_phandle(phandle);
+	if (!mtd_np) {
+		dev_err(rt2x00dev->dev, "failed to load mtd phandle\n");
+		return -EINVAL;
+	}
+
+	part = of_get_property(mtd_np, "label", NULL);
+	if (!part)
+		part = mtd_np->name;
+
+	mtd = get_mtd_device_nm(part);
+	if (IS_ERR(mtd)) {
+		dev_err(rt2x00dev->dev, "failed to get mtd device \"%s\"\n", part);
+		return PTR_ERR(mtd);
+	}
+
+	if (size > sizeof(*list))
+		offset = be32_to_cpup(list);
+
+	ret = mtd_read(mtd, offset, rt2x00dev->ops->eeprom_size,
+		       &retlen, (u_char *)rt2x00dev->eeprom);
+	put_mtd_device(mtd);
+
+	if (ret || retlen != rt2x00dev->ops->eeprom_size) {
+		dev_err(rt2x00dev->dev, "failed to load eeprom from device \"%s\"\n", part);
+		return ret;
+	}
+
+	dev_info(rt2x00dev->dev, "loaded eeprom from mtd device \"%s\"\n", part);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(rt2800_read_eeprom_mtd);
+#endif
+
+int rt2800_read_eeprom_nvmem(struct rt2x00_dev *rt2x00dev)
+{
+	struct device *dev = rt2x00dev->dev;
+	unsigned int len = rt2x00dev->ops->eeprom_size;
+	struct nvmem_cell *cell;
+	const void *data;
+	size_t retlen;
+
+	cell = nvmem_cell_get(dev, "eeprom");
+	if (IS_ERR(cell))
+		return PTR_ERR(cell);
+
+	data = nvmem_cell_read(cell, &retlen);
+	nvmem_cell_put(cell);
+
+	if (IS_ERR(data))
+		return PTR_ERR(data);
+
+	if (retlen != len) {
+		dev_err(rt2x00dev->dev, "invalid eeprom size, required: 0x%04x\n", len);
+		kfree(data);
+		return -EINVAL;
+	}
+
+	memcpy(rt2x00dev->eeprom, data, len);
+	kfree(data);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rt2800_read_eeprom_nvmem);
 
 static u8 rt2800_get_txmixer_gain_24g(struct rt2x00_dev *rt2x00dev)
 {
@@ -11115,7 +11251,9 @@ static int rt2800_validate_eeprom(struct rt2x00_dev *rt2x00dev)
 	 * Start validation of the data that has been read.
 	 */
 	mac = rt2800_eeprom_addr(rt2x00dev, EEPROM_MAC_ADDR_0);
-	rt2x00lib_set_mac_address(rt2x00dev, mac);
+	retval = rt2x00lib_set_mac_address(rt2x00dev, mac);
+	if (retval)
+		return retval;
 
 	word = rt2800_eeprom_read(rt2x00dev, EEPROM_NIC_CONF0);
 	if (word == 0xffff) {
@@ -11989,13 +12127,12 @@ static int rt2800_probe_hw_mode(struct rt2x00_dev *rt2x00dev)
 	/*
 	 * Create channel information and survey arrays
 	 */
-	info = kcalloc(spec->num_channels, sizeof(*info), GFP_KERNEL);
+	info = kzalloc_objs(*info, spec->num_channels);
 	if (!info)
 		return -ENOMEM;
 
 	rt2x00dev->chan_survey =
-		kcalloc(spec->num_channels, sizeof(struct rt2x00_chan_survey),
-			GFP_KERNEL);
+		kzalloc_objs(struct rt2x00_chan_survey, spec->num_channels);
 	if (!rt2x00dev->chan_survey) {
 		kfree(info);
 		return -ENOMEM;

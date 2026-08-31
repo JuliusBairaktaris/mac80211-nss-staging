@@ -96,6 +96,34 @@ static int rt2800soc_set_device_state(struct rt2x00_dev *rt2x00dev,
 	return retval;
 }
 
+static int rt2800soc_read_eeprom(struct rt2x00_dev *rt2x00dev)
+{
+	void __iomem *base_addr;
+
+	if (!rt2800_read_eeprom_nvmem(rt2x00dev))
+		return 0;
+
+#if IS_ENABLED(CONFIG_SOC_RT288X) || IS_ENABLED(CONFIG_SOC_RT305X)
+	if (!rt2800_read_eeprom_mtd(rt2x00dev))
+		return 0;
+#endif
+
+	if (!rt2800_read_eeprom_file(rt2x00dev))
+		return 0;
+
+	if (!rt2800_read_eeprom_data(rt2x00dev))
+		return 0;
+
+	base_addr = ioremap(0x1F040000, EEPROM_SIZE);
+	if (!base_addr)
+		return -ENOMEM;
+
+	memcpy_fromio(rt2x00dev->eeprom, base_addr, EEPROM_SIZE);
+
+	iounmap(base_addr);
+	return 0;
+}
+
 /* Firmware functions */
 static char *rt2800soc_get_firmware_name(struct rt2x00_dev *rt2x00dev)
 {
@@ -204,7 +232,7 @@ static const struct rt2800_ops rt2800soc_rt2800_ops = {
 	.register_multiread	= rt2x00mmio_register_multiread,
 	.register_multiwrite	= rt2x00mmio_register_multiwrite,
 	.regbusy_read		= rt2x00mmio_regbusy_read,
-	.read_eeprom		= rt2x00lib_read_eeprom,
+	.read_eeprom		= rt2800soc_read_eeprom,
 	.hwcrypt_disabled	= rt2800soc_hwcrypt_disabled,
 	.drv_write_firmware	= rt2800soc_write_firmware,
 	.drv_init_registers	= rt2800mmio_init_registers,
@@ -321,7 +349,6 @@ static int rt2x00soc_probe(struct platform_device *pdev, const struct rt2x00_ops
 	rt2x00dev->name = pdev->dev.driver->name;
 	rt2x00dev->csr.base = mem;
 
-	set_bit(REQUIRE_EEPROM_FILE, &rt2x00dev->cap_flags);
 	rt2x00_set_chip_intf(rt2x00dev, RT2X00_CHIP_INTF_SOC);
 
 	retval = rt2x00lib_probe_dev(rt2x00dev);

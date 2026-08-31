@@ -693,7 +693,6 @@ enum rt2x00_capability_flags {
 	REQUIRE_HT_TX_DESC,
 	REQUIRE_PS_AUTOWAKE,
 	REQUIRE_DELAYED_RFKILL,
-	REQUIRE_EEPROM_FILE,
 
 	/*
 	 * Capabilities
@@ -1011,7 +1010,6 @@ struct rt2x00_dev {
 	/* Extra TX headroom required for alignment purposes. */
 	unsigned int extra_tx_headroom;
 
-	struct usb_anchor *anchor;
 	unsigned int num_proto_errs;
 
 	/* Clock for System On Chip devices. */
@@ -1021,6 +1019,8 @@ struct rt2x00_dev {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_default;
 	struct pinctrl_state *pins_pa_gpio;
+
+	struct usb_anchor anchor[];
 };
 
 struct rt2x00_bar_list_entry {
@@ -1434,7 +1434,7 @@ static inline void rt2x00debug_dump_frame(struct rt2x00_dev *rt2x00dev,
  */
 u32 rt2x00lib_get_bssidx(struct rt2x00_dev *rt2x00dev,
 			 struct ieee80211_vif *vif);
-void rt2x00lib_set_mac_address(struct rt2x00_dev *rt2x00dev, u8 *eeprom_mac_addr);
+int rt2x00lib_set_mac_address(struct rt2x00_dev *rt2x00dev, u8 *eeprom_mac_addr);
 
 /*
  * Interrupt context handlers.
@@ -1513,13 +1513,4 @@ void rt2x00lib_remove_dev(struct rt2x00_dev *rt2x00dev);
 int rt2x00lib_suspend(struct rt2x00_dev *rt2x00dev);
 int rt2x00lib_resume(struct rt2x00_dev *rt2x00dev);
 
-/*
- * EEPROM file handlers.
- */
-#ifdef CPTCFG_RT2X00_LIB_EEPROM
-int rt2x00lib_read_eeprom(struct rt2x00_dev *rt2x00dev);
-#else
-#define rt2x00lib_read_eeprom	NULL
-#endif /* CPTCFG_RT2X00_LIB_EEPROM */
- 
 #endif /* RT2X00_H */

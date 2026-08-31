@@ -611,7 +611,7 @@ static int ath9k_init_priv(struct ath9k_htc_priv *priv,
 	struct ath_common *common;
 	int i, ret = 0, csz = 0;
 
-	ah = kzalloc(sizeof(struct ath_hw), GFP_KERNEL);
+	ah = kzalloc_obj(struct ath_hw);
 	if (!ah)
 		return -ENOMEM;
 
@@ -748,7 +748,6 @@ static void ath9k_set_hw_capab(struct ath9k_htc_priv *priv,
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN |
 			    WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL |
 			    WIPHY_FLAG_HAS_CHANNEL_SWITCH |
-			    WIPHY_FLAG_SUPPORTS_5_10_MHZ |
 			    WIPHY_FLAG_SUPPORTS_TDLS;
 
 	hw->queues = 4;
@@ -1022,21 +1021,3 @@ int ath9k_htc_resume(struct htc_target *htc_handle)
 	return ret;
 }
 #endif
-
-static int __init ath9k_htc_init(void)
-{
-	if (ath9k_hif_usb_init() < 0) {
-		pr_err("No USB devices found, driver not installed\n");
-		return -ENODEV;
-	}
-
-	return 0;
-}
-module_init(ath9k_htc_init);
-
-static void __exit ath9k_htc_exit(void)
-{
-	ath9k_hif_usb_exit();
-	pr_info("Driver unloaded\n");
-}
-module_exit(ath9k_htc_exit);
